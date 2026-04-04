@@ -392,7 +392,7 @@ main() {
   wait_for_http_200 "Synapse" "http://${LOOPBACK_HOST}:${TF_VAR_synapse_host_port}/_matrix/client/versions"
 
   log "Waiting for Nextcloud OCC availability..."
-  wait_for_nextcloud
+  wait_for_nextcloud 120 5
 
   log "Installing and configuring Nextcloud..."
   ensure_nextcloud_installed
