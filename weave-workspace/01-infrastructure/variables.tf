@@ -4,6 +4,17 @@ variable "docker_network_name" {
   default     = "weave_network"
 }
 
+variable "docker_host" {
+  description = "Docker daemon endpoint used by the Terraform Docker provider."
+  type        = string
+  default     = "unix:///var/run/docker.sock"
+
+  validation {
+    condition     = startswith(var.docker_host, "unix://")
+    error_message = "docker_host must be a unix socket endpoint such as unix:///var/run/docker.sock."
+  }
+}
+
 variable "tenant_slug" {
   description = "Tenant identifier used for the Keycloak realm."
   type        = string
@@ -80,6 +91,18 @@ variable "synapse_host_port" {
   default     = 8008
 }
 
+variable "synapse_uid" {
+  description = "UID used by Synapse for writable files in the mounted data volume."
+  type        = number
+  default     = 991
+}
+
+variable "synapse_gid" {
+  description = "GID used by Synapse for writable files in the mounted data volume."
+  type        = number
+  default     = 991
+}
+
 variable "nextcloud_host_port" {
   description = "Direct host port for Nextcloud."
   type        = number
@@ -123,7 +146,7 @@ variable "nextcloud_image" {
 }
 
 variable "db_name" {
-  description = "Shared PostgreSQL database name."
+  description = "Base name used to derive per-service PostgreSQL databases inside the shared PostgreSQL instance."
   type        = string
   default     = "weave"
 }

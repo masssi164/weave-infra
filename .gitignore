@@ -2,6 +2,7 @@
 .commandcode/
 skills-lock.json
 
+weave-workspace/.generated/
 weave-workspace/**/.generated/
 weave-workspace/**/.terraform/
 weave-workspace/**/*.tfstate

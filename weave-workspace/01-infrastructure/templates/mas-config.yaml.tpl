@@ -30,7 +30,8 @@ matrix:
 secrets:
   encryption: ${encryption_secret}
   keys:
-    - key_file: /config/signing.key
+    - kid: ${signing_key_kid}
+      key_file: /config/signing.key
 
 passwords:
   enabled: false

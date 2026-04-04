@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Stack
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive weave-workspace
+
+      - name: Initialize and validate infrastructure stage
+        run: |
+          terraform -chdir=weave-workspace/01-infrastructure init -backend=false -input=false
+          terraform -chdir=weave-workspace/01-infrastructure validate
+
+      - name: Initialize and validate Keycloak setup stage
+        run: |
+          terraform -chdir=weave-workspace/02-keycloak-setup init -backend=false -input=false
+          terraform -chdir=weave-workspace/02-keycloak-setup validate
+
+      - name: Lint bootstrap script
+        run: |
+          bash -n weave-workspace/install.sh
+          shellcheck weave-workspace/install.sh
