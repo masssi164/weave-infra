@@ -2,41 +2,49 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-INFRA_DIR="${ROOT_DIR}/01-infrastructure"
-KEYCLOAK_DIR="${ROOT_DIR}/02-keycloak-setup"
+readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly INFRA_DIR="${ROOT_DIR}/01-infrastructure"
+readonly KEYCLOAK_DIR="${ROOT_DIR}/02-keycloak-setup"
+
+log() {
+  printf '%s\n' "$*"
+}
+
+fail() {
+  printf '%s\n' "$*" >&2
+  exit 1
+}
 
 require_command() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "Missing required command: $1" >&2
-    exit 1
-  fi
+  command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
-ensure_var() {
+set_default_var() {
   local name="$1"
-  local default_value="$2"
+  local value="$2"
+
   if [[ -z "${!name:-}" ]]; then
-    export "${name}=${default_value}"
+    export "${name}=${value}"
   fi
 }
 
-generate_base64_secret() {
+set_default_secret() {
+  local name="$1"
+  local value="$2"
+
+  if [[ -z "${!name:-}" ]]; then
+    export "${name}=${value}"
+  fi
+}
+
+random_base64() {
   local bytes="$1"
   openssl rand -base64 "${bytes}" | tr -d '\n'
 }
 
-generate_hex_secret() {
+random_hex() {
   local bytes="$1"
   openssl rand -hex "${bytes}"
-}
-
-ensure_secret() {
-  local name="$1"
-  local value="$2"
-  if [[ -z "${!name:-}" ]]; then
-    export "${name}=${value}"
-  fi
 }
 
 ensure_mas_signing_key() {
@@ -46,31 +54,34 @@ ensure_mas_signing_key() {
 
   local key_file
   key_file="$(mktemp)"
+  trap 'rm -f "${key_file}"' RETURN
+
   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "${key_file}" >/dev/null 2>&1
   export TF_VAR_mas_signing_key_pem
   TF_VAR_mas_signing_key_pem="$(<"${key_file}")"
-  rm -f "${key_file}"
 }
 
-wait_for_keycloak() {
-  local attempts=120
-  local sleep_seconds=5
-  local url="http://localhost:${TF_VAR_keycloak_host_port:-8080}/health/ready"
+wait_for_http_200() {
+  local name="$1"
+  local url="$2"
+  local attempts="${3:-120}"
+  local sleep_seconds="${4:-5}"
+  local status_code
 
   for ((i = 1; i <= attempts; i++)); do
-    if [[ "$(curl -s -o /dev/null -w "%{http_code}" "${url}" || true)" == "200" ]]; then
+    status_code="$(curl -s -o /dev/null -w '%{http_code}' "${url}" || true)"
+    if [[ "${status_code}" == "200" ]]; then
       return 0
     fi
     sleep "${sleep_seconds}"
   done
 
-  echo "Keycloak never became ready at ${url}" >&2
-  return 1
+  fail "${name} never became ready at ${url}"
 }
 
 wait_for_nextcloud() {
-  local attempts=120
-  local sleep_seconds=5
+  local attempts="${1:-120}"
+  local sleep_seconds="${2:-5}"
 
   for ((i = 1; i <= attempts; i++)); do
     if docker exec --user www-data weave-nextcloud php occ status >/dev/null 2>&1; then
@@ -79,87 +90,158 @@ wait_for_nextcloud() {
     sleep "${sleep_seconds}"
   done
 
-  echo "Nextcloud did not finish bootstrapping in time." >&2
-  return 1
+  fail "Nextcloud did not finish bootstrapping in time."
 }
 
 occ() {
   docker exec --user www-data weave-nextcloud php occ "$@"
 }
 
-require_command curl
-require_command docker
-require_command gh
-require_command openssl
-require_command terraform
+terraform_apply() {
+  local dir="$1"
 
-mkdir -p \
-  "${INFRA_DIR}/.generated/db" \
-  "${INFRA_DIR}/.generated/mas" \
-  "${INFRA_DIR}/.generated/synapse"
+  terraform -chdir="${dir}" init -input=false
+  terraform -chdir="${dir}" apply -input=false -auto-approve
+}
 
-ensure_var TF_VAR_tenant_slug "weave"
-ensure_var TF_VAR_tenant_domain "weave.local"
-ensure_var TF_VAR_public_scheme "http"
-ensure_var TF_VAR_proxy_host_port "8090"
-ensure_var TF_VAR_keycloak_admin_username "admin"
-ensure_var TF_VAR_db_admin_username "weave_admin"
-ensure_var TF_VAR_keycloak_db_username "keycloak"
-ensure_var TF_VAR_mas_db_username "mas"
-ensure_var TF_VAR_synapse_db_username "synapse"
-ensure_var TF_VAR_nextcloud_db_username "nextcloud"
-ensure_var TF_VAR_nextcloud_admin_username "admin"
+terraform_output_raw() {
+  local dir="$1"
+  local name="$2"
 
-ensure_secret TF_VAR_db_admin_password "$(generate_base64_secret 24)"
-ensure_secret TF_VAR_keycloak_admin_password "$(generate_base64_secret 24)"
-ensure_secret TF_VAR_keycloak_db_password "$(generate_base64_secret 24)"
-ensure_secret TF_VAR_mas_db_password "$(generate_base64_secret 24)"
-ensure_secret TF_VAR_synapse_db_password "$(generate_base64_secret 24)"
-ensure_secret TF_VAR_nextcloud_db_password "$(generate_base64_secret 24)"
-ensure_secret TF_VAR_nextcloud_admin_password "$(generate_base64_secret 24)"
-ensure_secret TF_VAR_matrix_mas_client_secret "$(generate_base64_secret 32)"
-ensure_secret TF_VAR_mas_encryption_secret "$(generate_hex_secret 32)"
-ensure_secret TF_VAR_mas_matrix_secret "$(generate_base64_secret 32)"
-ensure_secret TF_VAR_synapse_registration_shared_secret "$(generate_base64_secret 32)"
-ensure_secret TF_VAR_synapse_macaroon_secret_key "$(generate_base64_secret 32)"
-ensure_secret TF_VAR_synapse_form_secret "$(generate_base64_secret 32)"
-ensure_mas_signing_key
+  terraform -chdir="${dir}" output -raw "${name}"
+}
 
-terraform -chdir="${INFRA_DIR}" init
-terraform -chdir="${INFRA_DIR}" apply -auto-approve
+public_port_suffix() {
+  if [[ "${TF_VAR_proxy_host_port}" == "80" || "${TF_VAR_proxy_host_port}" == "443" ]]; then
+    printf ''
+  else
+    printf ':%s' "${TF_VAR_proxy_host_port}"
+  fi
+}
 
-wait_for_keycloak
+public_host() {
+  local subdomain="$1"
+  printf '%s.%s' "${subdomain}" "${TF_VAR_tenant_domain}"
+}
 
-terraform -chdir="${KEYCLOAK_DIR}" init
-terraform -chdir="${KEYCLOAK_DIR}" apply -auto-approve
+ensure_generated_directories() {
+  mkdir -p \
+    "${INFRA_DIR}/.generated/db" \
+    "${INFRA_DIR}/.generated/mas" \
+    "${INFRA_DIR}/.generated/synapse"
+}
 
-wait_for_nextcloud
+ensure_default_inputs() {
+  local defaults=(
+    "TF_VAR_tenant_slug=weave"
+    "TF_VAR_tenant_domain=weave.local"
+    "TF_VAR_auth_subdomain=auth"
+    "TF_VAR_mas_subdomain=mas"
+    "TF_VAR_matrix_subdomain=matrix"
+    "TF_VAR_files_subdomain=files"
+    "TF_VAR_public_scheme=http"
+    "TF_VAR_proxy_host_port=8090"
+    "TF_VAR_keycloak_host_port=8080"
+    "TF_VAR_keycloak_admin_username=admin"
+    "TF_VAR_db_admin_username=weave_admin"
+    "TF_VAR_keycloak_db_username=keycloak"
+    "TF_VAR_mas_db_username=mas"
+    "TF_VAR_synapse_db_username=synapse"
+    "TF_VAR_nextcloud_db_username=nextcloud"
+    "TF_VAR_nextcloud_admin_username=admin"
+  )
 
-issuer_url="$(terraform -chdir="${KEYCLOAK_DIR}" output -raw keycloak_issuer_url)"
-nextcloud_client_secret="$(terraform -chdir="${KEYCLOAK_DIR}" output -raw nextcloud_client_secret)"
-nextcloud_base_url="${TF_VAR_public_scheme}://files.${TF_VAR_tenant_domain}"
+  local entry
+  for entry in "${defaults[@]}"; do
+    set_default_var "${entry%%=*}" "${entry#*=}"
+  done
+}
 
-if [[ "${TF_VAR_proxy_host_port}" != "80" && "${TF_VAR_proxy_host_port}" != "443" ]]; then
-  nextcloud_base_url="${nextcloud_base_url}:${TF_VAR_proxy_host_port}"
-fi
+ensure_generated_secrets() {
+  set_default_secret TF_VAR_db_admin_password "$(random_base64 24)"
+  set_default_secret TF_VAR_keycloak_admin_password "$(random_base64 24)"
+  set_default_secret TF_VAR_keycloak_db_password "$(random_base64 24)"
+  set_default_secret TF_VAR_mas_db_password "$(random_base64 24)"
+  set_default_secret TF_VAR_synapse_db_password "$(random_base64 24)"
+  set_default_secret TF_VAR_nextcloud_db_password "$(random_base64 24)"
+  set_default_secret TF_VAR_nextcloud_admin_password "$(random_base64 24)"
+  set_default_secret TF_VAR_matrix_mas_client_secret "$(random_base64 32)"
+  set_default_secret TF_VAR_mas_encryption_secret "$(random_hex 32)"
+  set_default_secret TF_VAR_mas_matrix_secret "$(random_base64 32)"
+  set_default_secret TF_VAR_synapse_registration_shared_secret "$(random_base64 32)"
+  set_default_secret TF_VAR_synapse_macaroon_secret_key "$(random_base64 32)"
+  set_default_secret TF_VAR_synapse_form_secret "$(random_base64 32)"
+  ensure_mas_signing_key
+}
 
-occ app:install user_oidc || true
-occ app:enable user_oidc
+configure_nextcloud_oidc() {
+  local issuer_url
+  local nextcloud_client_secret
+  local allow_insecure_http
 
-if [[ "${TF_VAR_public_scheme}" == "http" ]]; then
-  occ config:app:set --type=boolean --value=1 user_oidc allow_insecure_http
-fi
+  issuer_url="$(terraform_output_raw "${KEYCLOAK_DIR}" keycloak_issuer_url)"
+  nextcloud_client_secret="$(terraform_output_raw "${KEYCLOAK_DIR}" nextcloud_client_secret)"
 
-occ user_oidc:provider keycloak \
-  --clientid="nextcloud" \
-  --clientsecret="${nextcloud_client_secret}" \
-  --discoveryuri="${issuer_url}/.well-known/openid-configuration" \
-  --group-provisioning=1
+  if ! occ app:enable user_oidc >/dev/null 2>&1; then
+    occ app:install user_oidc
+    occ app:enable user_oidc
+  fi
 
-echo
-echo "Add these host entries before using the browser-facing URLs:"
-echo "127.0.0.1 auth.${TF_VAR_tenant_domain} mas.${TF_VAR_tenant_domain} matrix.${TF_VAR_tenant_domain} files.${TF_VAR_tenant_domain}"
-echo
-echo "Keycloak admin: ${TF_VAR_keycloak_admin_username} / ${TF_VAR_keycloak_admin_password}"
-echo "Nextcloud admin: ${TF_VAR_nextcloud_admin_username} / ${TF_VAR_nextcloud_admin_password}"
-echo "Nextcloud URL: ${nextcloud_base_url}"
+  allow_insecure_http=0
+  if [[ "${TF_VAR_public_scheme}" == "http" ]]; then
+    allow_insecure_http=1
+  fi
+
+  occ config:app:set --type=boolean --value="${allow_insecure_http}" user_oidc allow_insecure_http
+  occ user_oidc:provider keycloak \
+    --clientid="nextcloud" \
+    --clientsecret="${nextcloud_client_secret}" \
+    --discoveryuri="${issuer_url}/.well-known/openid-configuration" \
+    --group-provisioning=1
+}
+
+print_summary() {
+  local suffix
+  local nextcloud_url
+
+  suffix="$(public_port_suffix)"
+  nextcloud_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_files_subdomain}")${suffix}"
+
+  log
+  log "Add these host entries before using the browser-facing URLs:"
+  log "127.0.0.1 $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_mas_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}") $(public_host "${TF_VAR_files_subdomain}")"
+  log
+  log "Keycloak admin: ${TF_VAR_keycloak_admin_username} / ${TF_VAR_keycloak_admin_password}"
+  log "Nextcloud admin: ${TF_VAR_nextcloud_admin_username} / ${TF_VAR_nextcloud_admin_password}"
+  log "Nextcloud URL: ${nextcloud_url}"
+}
+
+main() {
+  require_command curl
+  require_command docker
+  require_command openssl
+  require_command terraform
+
+  ensure_generated_directories
+  ensure_default_inputs
+  ensure_generated_secrets
+
+  log "Applying infrastructure module..."
+  terraform_apply "${INFRA_DIR}"
+
+  log "Waiting for Keycloak readiness..."
+  wait_for_http_200 "Keycloak" "http://localhost:${TF_VAR_keycloak_host_port}/health/ready"
+
+  log "Applying Keycloak configuration module..."
+  terraform_apply "${KEYCLOAK_DIR}"
+
+  log "Waiting for Nextcloud OCC availability..."
+  wait_for_nextcloud
+
+  log "Configuring Nextcloud OIDC provider..."
+  configure_nextcloud_oidc
+
+  print_summary
+}
+
+main "$@"

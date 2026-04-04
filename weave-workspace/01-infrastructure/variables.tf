@@ -8,12 +8,41 @@ variable "tenant_slug" {
   description = "Tenant identifier used for the Keycloak realm."
   type        = string
   default     = "weave"
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]+$", var.tenant_slug))
+    error_message = "tenant_slug must contain only lowercase letters, numbers, and hyphens."
+  }
 }
 
 variable "tenant_domain" {
-  description = "Base domain used to derive auth, MAS, Matrix, and Nextcloud hostnames."
+  description = "Base domain used to derive public service hostnames."
   type        = string
   default     = "weave.local"
+}
+
+variable "auth_subdomain" {
+  description = "Subdomain used for Keycloak."
+  type        = string
+  default     = "auth"
+}
+
+variable "mas_subdomain" {
+  description = "Subdomain used for Matrix Authentication Service."
+  type        = string
+  default     = "mas"
+}
+
+variable "matrix_subdomain" {
+  description = "Subdomain used for Matrix."
+  type        = string
+  default     = "matrix"
+}
+
+variable "files_subdomain" {
+  description = "Subdomain used for Nextcloud."
+  type        = string
+  default     = "files"
 }
 
 variable "public_scheme" {
@@ -55,6 +84,42 @@ variable "nextcloud_host_port" {
   description = "Direct host port for Nextcloud."
   type        = number
   default     = 8083
+}
+
+variable "proxy_image" {
+  description = "Traefik image used for the reverse proxy."
+  type        = string
+  default     = "traefik:v3.0"
+}
+
+variable "postgres_image" {
+  description = "PostgreSQL image used for the shared database."
+  type        = string
+  default     = "postgres:15"
+}
+
+variable "keycloak_image" {
+  description = "Keycloak image used for identity management."
+  type        = string
+  default     = "quay.io/keycloak/keycloak:latest"
+}
+
+variable "mas_image" {
+  description = "Matrix Authentication Service image."
+  type        = string
+  default     = "ghcr.io/matrix-org/matrix-authentication-service:latest"
+}
+
+variable "synapse_image" {
+  description = "Synapse image."
+  type        = string
+  default     = "matrixdotorg/synapse:latest"
+}
+
+variable "nextcloud_image" {
+  description = "Nextcloud image."
+  type        = string
+  default     = "nextcloud:apache"
 }
 
 variable "db_name" {

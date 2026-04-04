@@ -14,7 +14,7 @@ provider "keycloak" {
   username  = var.keycloak_admin_username
   password  = var.keycloak_admin_password
   realm     = "master"
-  url       = "http://localhost:8080"
+  url       = "http://localhost:${var.keycloak_host_port}"
 }
 
 locals {
@@ -23,11 +23,70 @@ locals {
     (var.public_scheme == "https" && var.proxy_host_port == 443)
   ) ? "" : ":${var.proxy_host_port}"
 
-  keycloak_public_url  = "${var.public_scheme}://auth.${var.tenant_domain}${local.public_port_suffix}"
-  mas_public_url       = "${var.public_scheme}://mas.${var.tenant_domain}${local.public_port_suffix}"
-  nextcloud_public_url = "${var.public_scheme}://files.${var.tenant_domain}${local.public_port_suffix}"
+  public_hosts = {
+    keycloak  = "${var.auth_subdomain}.${var.tenant_domain}"
+    mas       = "${var.mas_subdomain}.${var.tenant_domain}"
+    nextcloud = "${var.files_subdomain}.${var.tenant_domain}"
+  }
+
+  public_urls = {
+    for service, host in local.public_hosts :
+    service => "${var.public_scheme}://${host}${local.public_port_suffix}"
+  }
 
   matrix_mas_upstream_id = "01JQ7N9R4QK6W3M5X8Y2ZC1DHF"
+
+  client_defaults = {
+    enabled                             = true
+    standard_flow_enabled               = false
+    implicit_flow_enabled               = false
+    direct_access_grants_enabled        = false
+    valid_redirect_uris                 = []
+    valid_post_logout_redirect_uris     = []
+    web_origins                         = []
+    pkce_code_challenge_method          = null
+    client_secret                       = null
+    backchannel_logout_url              = null
+    backchannel_logout_session_required = null
+  }
+
+  client_specs = {
+    weave_app = merge(local.client_defaults, {
+      name                       = "weave-app"
+      client_id                  = "weave-app"
+      access_type                = "PUBLIC"
+      standard_flow_enabled      = true
+      pkce_code_challenge_method = "S256"
+      valid_redirect_uris        = ["weaveapp://login/callback"]
+    })
+    weave_backend = merge(local.client_defaults, {
+      name        = "weave-backend"
+      client_id   = "weave-backend"
+      access_type = "BEARER-ONLY"
+    })
+    matrix_mas = merge(local.client_defaults, {
+      name                  = "matrix-mas"
+      client_id             = "matrix-mas"
+      access_type           = "CONFIDENTIAL"
+      standard_flow_enabled = true
+      client_secret         = var.matrix_mas_client_secret
+      valid_redirect_uris = [
+        "${local.public_urls.mas}/upstream/callback/${local.matrix_mas_upstream_id}",
+      ]
+      web_origins = ["+"]
+    })
+    nextcloud = merge(local.client_defaults, {
+      name                                = "nextcloud"
+      client_id                           = "nextcloud"
+      access_type                         = "CONFIDENTIAL"
+      standard_flow_enabled               = true
+      valid_redirect_uris                 = ["${local.public_urls.nextcloud}/*"]
+      valid_post_logout_redirect_uris     = ["${local.public_urls.nextcloud}/*"]
+      backchannel_logout_url              = "${local.public_urls.nextcloud}/index.php/apps/user_oidc/backchannel-logout/keycloak"
+      backchannel_logout_session_required = true
+      web_origins                         = ["+"]
+    })
+  }
 }
 
 resource "keycloak_realm" "tenant" {
@@ -41,62 +100,30 @@ resource "keycloak_realm" "tenant" {
   duplicate_emails_allowed       = false
 }
 
-resource "keycloak_openid_client" "weave_app" {
+resource "keycloak_openid_client" "client" {
+  for_each = local.client_specs
+
   realm_id  = keycloak_realm.tenant.id
-  client_id = "weave-app"
-  name      = "weave-app"
+  client_id = each.value.client_id
+  name      = each.value.name
 
-  access_type                  = "PUBLIC"
-  enabled                      = true
-  standard_flow_enabled        = true
-  implicit_flow_enabled        = false
-  direct_access_grants_enabled = false
-  pkce_code_challenge_method   = "S256"
-  valid_redirect_uris          = ["weaveapp://login/callback"]
-}
-
-resource "keycloak_openid_client" "weave_backend" {
-  realm_id  = keycloak_realm.tenant.id
-  client_id = "weave-backend"
-  name      = "weave-backend"
-
-  access_type = "BEARER-ONLY"
-  enabled     = true
-}
-
-resource "keycloak_openid_client" "matrix_mas" {
-  realm_id  = keycloak_realm.tenant.id
-  client_id = "matrix-mas"
-  name      = "matrix-mas"
-
-  access_type           = "CONFIDENTIAL"
-  enabled               = true
-  standard_flow_enabled = true
-  client_secret         = var.matrix_mas_client_secret
-  valid_redirect_uris = [
-    "${local.mas_public_url}/upstream/callback/${local.matrix_mas_upstream_id}",
-  ]
-  web_origins = ["+"]
-}
-
-resource "keycloak_openid_client" "nextcloud" {
-  realm_id  = keycloak_realm.tenant.id
-  client_id = "nextcloud"
-  name      = "nextcloud"
-
-  access_type                         = "CONFIDENTIAL"
-  enabled                             = true
-  standard_flow_enabled               = true
-  valid_redirect_uris                 = ["${local.nextcloud_public_url}/*"]
-  valid_post_logout_redirect_uris     = ["${local.nextcloud_public_url}/*"]
-  backchannel_logout_url              = "${local.nextcloud_public_url}/index.php/apps/user_oidc/backchannel-logout/keycloak"
-  backchannel_logout_session_required = true
-  web_origins                         = ["+"]
+  access_type                         = each.value.access_type
+  enabled                             = each.value.enabled
+  standard_flow_enabled               = each.value.standard_flow_enabled
+  implicit_flow_enabled               = each.value.implicit_flow_enabled
+  direct_access_grants_enabled        = each.value.direct_access_grants_enabled
+  pkce_code_challenge_method          = each.value.pkce_code_challenge_method
+  client_secret                       = each.value.client_secret
+  valid_redirect_uris                 = each.value.valid_redirect_uris
+  valid_post_logout_redirect_uris     = each.value.valid_post_logout_redirect_uris
+  web_origins                         = each.value.web_origins
+  backchannel_logout_url              = each.value.backchannel_logout_url
+  backchannel_logout_session_required = each.value.backchannel_logout_session_required
 }
 
 resource "keycloak_openid_group_membership_protocol_mapper" "nextcloud_groups" {
   realm_id            = keycloak_realm.tenant.id
-  client_id           = keycloak_openid_client.nextcloud.id
+  client_id           = keycloak_openid_client.client["nextcloud"].id
   name                = "groups"
   claim_name          = "groups"
   full_path           = false
@@ -110,14 +137,14 @@ output "keycloak_realm_name" {
 }
 
 output "keycloak_issuer_url" {
-  value = "${local.keycloak_public_url}/realms/${keycloak_realm.tenant.realm}"
+  value = "${local.public_urls.keycloak}/realms/${keycloak_realm.tenant.realm}"
 }
 
 output "nextcloud_client_id" {
-  value = keycloak_openid_client.nextcloud.client_id
+  value = keycloak_openid_client.client["nextcloud"].client_id
 }
 
 output "nextcloud_client_secret" {
-  value     = keycloak_openid_client.nextcloud.client_secret
+  value     = keycloak_openid_client.client["nextcloud"].client_secret
   sensitive = true
 }

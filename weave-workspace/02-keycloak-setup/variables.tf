@@ -2,12 +2,35 @@ variable "tenant_slug" {
   description = "Tenant identifier used for the Keycloak realm."
   type        = string
   default     = "weave"
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]+$", var.tenant_slug))
+    error_message = "tenant_slug must contain only lowercase letters, numbers, and hyphens."
+  }
 }
 
 variable "tenant_domain" {
   description = "Base domain used to derive public service hostnames."
   type        = string
   default     = "weave.local"
+}
+
+variable "auth_subdomain" {
+  description = "Subdomain used for Keycloak."
+  type        = string
+  default     = "auth"
+}
+
+variable "mas_subdomain" {
+  description = "Subdomain used for Matrix Authentication Service."
+  type        = string
+  default     = "mas"
+}
+
+variable "files_subdomain" {
+  description = "Subdomain used for Nextcloud."
+  type        = string
+  default     = "files"
 }
 
 variable "public_scheme" {
@@ -25,6 +48,12 @@ variable "proxy_host_port" {
   description = "Host port exposed by the reverse proxy."
   type        = number
   default     = 8090
+}
+
+variable "keycloak_host_port" {
+  description = "Direct host port for Keycloak admin access."
+  type        = number
+  default     = 8080
 }
 
 variable "keycloak_admin_username" {

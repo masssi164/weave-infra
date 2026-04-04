@@ -4,7 +4,6 @@ skills-lock.json
 
 weave-workspace/**/.generated/
 weave-workspace/**/.terraform/
-weave-workspace/**/.terraform.lock.hcl
 weave-workspace/**/*.tfstate
 weave-workspace/**/*.tfstate.*
 weave-workspace/**/*.tfvars
