@@ -61,4 +61,13 @@ The stack expects these names to resolve to `127.0.0.1`:
 - `auth.<tenant_domain>`
 - `mas.<tenant_domain>`
 - `matrix.<tenant_domain>`
-- `files.<tenant_domain>`
+- `nextcloud.<tenant_domain>`
+- `api.<tenant_domain>`
+
+## Native App Contract
+
+The default Keycloak client contract for the Weave mobile app is:
+
+- client ID: `weave-app`
+- sign-in redirect URI: `com.massimotter.weave:/oauthredirect`
+- post-logout redirect URI: `com.massimotter.weave:/logout`

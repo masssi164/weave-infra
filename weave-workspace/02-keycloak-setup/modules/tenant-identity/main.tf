@@ -28,7 +28,10 @@ locals {
       access_type                = "PUBLIC"
       standard_flow_enabled      = true
       pkce_code_challenge_method = "S256"
-      valid_redirect_uris        = ["weaveapp://login/callback"]
+      valid_redirect_uris        = ["com.massimotter.weave:/oauthredirect"]
+      valid_post_logout_redirect_uris = [
+        "com.massimotter.weave:/logout",
+      ]
     })
     weave_backend = merge(local.client_defaults, {
       name        = "weave-backend"
