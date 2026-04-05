@@ -1,10 +1,10 @@
 output "public_hosts" {
-  description = "Browser-facing hostnames exposed by the local stack."
+  description = "Browser-facing hostnames reserved by the local stack contract."
   value       = local.public_hosts
 }
 
 output "public_urls" {
-  description = "Browser-facing URLs exposed by the local stack."
+  description = "Browser-facing URLs reserved by the local stack contract."
   value       = local.public_urls
 }
 

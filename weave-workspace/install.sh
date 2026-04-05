@@ -18,7 +18,8 @@ readonly PERSISTED_TF_VARS=(
   TF_VAR_auth_subdomain
   TF_VAR_mas_subdomain
   TF_VAR_matrix_subdomain
-  TF_VAR_files_subdomain
+  TF_VAR_nextcloud_subdomain
+  TF_VAR_api_subdomain
   TF_VAR_public_scheme
   TF_VAR_proxy_host_port
   TF_VAR_keycloak_host_port
@@ -124,6 +125,21 @@ load_persisted_env() {
   for ((index = 0; index < ${#preset_names[@]}; index++)); do
     export "${preset_names[$index]}=${preset_values[$index]}"
   done
+
+  # Preserve compatibility with older bootstrap environments that used
+  # TF_VAR_files_subdomain before the contract was renamed.
+  if [[ ! " ${preset_names[*]} " =~ " TF_VAR_nextcloud_subdomain " ]] &&
+    [[ -n "${TF_VAR_files_subdomain:-}" ]]; then
+    export TF_VAR_nextcloud_subdomain="${TF_VAR_files_subdomain}"
+    unset TF_VAR_files_subdomain
+  fi
+
+  # Migrate the legacy default Nextcloud hostname from files.<tenant_domain>
+  # to nextcloud.<tenant_domain> unless the caller already set a value.
+  if [[ ! " ${preset_names[*]} " =~ " TF_VAR_nextcloud_subdomain " ]] &&
+    [[ "${TF_VAR_nextcloud_subdomain:-}" == "files" ]]; then
+    export TF_VAR_nextcloud_subdomain="nextcloud"
+  fi
 }
 
 persist_bootstrap_env() {
@@ -236,7 +252,8 @@ ensure_default_inputs() {
     "TF_VAR_auth_subdomain=auth"
     "TF_VAR_mas_subdomain=mas"
     "TF_VAR_matrix_subdomain=matrix"
-    "TF_VAR_files_subdomain=files"
+    "TF_VAR_nextcloud_subdomain=nextcloud"
+    "TF_VAR_api_subdomain=api"
     "TF_VAR_public_scheme=http"
     "TF_VAR_proxy_host_port=8090"
     "TF_VAR_keycloak_host_port=8080"
@@ -308,7 +325,7 @@ configure_nextcloud_base_url() {
   local nextcloud_host
   local nextcloud_url
 
-  nextcloud_host="$(public_host "${TF_VAR_files_subdomain}")"
+  nextcloud_host="$(public_host "${TF_VAR_nextcloud_subdomain}")"
   nextcloud_url="${TF_VAR_public_scheme}://${nextcloud_host}$(public_port_suffix)"
 
   occ config:system:set trusted_domains 0 --value="${nextcloud_host}"
@@ -349,18 +366,26 @@ configure_nextcloud_oidc() {
 
 print_summary() {
   local suffix
+  local backend_url
   local nextcloud_url
+  local weave_client_id
 
   suffix="$(public_port_suffix)"
-  nextcloud_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_files_subdomain}")${suffix}"
+  nextcloud_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_nextcloud_subdomain}")${suffix}"
+  backend_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_api_subdomain}")${suffix}"
+  weave_client_id="$(terraform_output_raw "${KEYCLOAK_DIR}" weave_app_client_id)"
 
   log
   log "Add these host entries before using the browser-facing URLs:"
-  log "127.0.0.1 $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_mas_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}") $(public_host "${TF_VAR_files_subdomain}")"
+  log "127.0.0.1 $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_mas_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_api_subdomain}")"
   log
+  log "Weave app client ID: ${weave_client_id}"
+  log "Weave app sign-in redirect: com.massimotter.weave:/oauthredirect"
+  log "Weave app post-logout redirect: com.massimotter.weave:/logout"
   log "Keycloak admin: ${TF_VAR_keycloak_admin_username} / ${TF_VAR_keycloak_admin_password}"
   log "Nextcloud admin: ${TF_VAR_nextcloud_admin_username} / ${TF_VAR_nextcloud_admin_password}"
   log "Nextcloud URL: ${nextcloud_url}"
+  log "Reserved backend URL: ${backend_url}"
 }
 
 main() {

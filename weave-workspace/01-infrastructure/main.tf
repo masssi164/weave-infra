@@ -36,7 +36,8 @@ locals {
     keycloak  = "${var.auth_subdomain}.${var.tenant_domain}"
     mas       = "${var.mas_subdomain}.${var.tenant_domain}"
     matrix    = "${var.matrix_subdomain}.${var.tenant_domain}"
-    nextcloud = "${var.files_subdomain}.${var.tenant_domain}"
+    nextcloud = "${var.nextcloud_subdomain}.${var.tenant_domain}"
+    api       = "${var.api_subdomain}.${var.tenant_domain}"
   }
 
   public_urls = {

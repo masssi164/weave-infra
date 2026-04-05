@@ -27,10 +27,16 @@ variable "mas_subdomain" {
   default     = "mas"
 }
 
-variable "files_subdomain" {
+variable "nextcloud_subdomain" {
   description = "Subdomain used for Nextcloud."
   type        = string
-  default     = "files"
+  default     = "nextcloud"
+}
+
+variable "api_subdomain" {
+  description = "Subdomain reserved for the Weave backend API."
+  type        = string
+  default     = "api"
 }
 
 variable "public_scheme" {
