@@ -131,6 +131,7 @@ load_persisted_env() {
   if [[ ! " ${preset_names[*]} " =~ " TF_VAR_nextcloud_subdomain " ]] &&
     [[ -n "${TF_VAR_files_subdomain:-}" ]]; then
     export TF_VAR_nextcloud_subdomain="${TF_VAR_files_subdomain}"
+    unset TF_VAR_files_subdomain
   fi
 
   # Migrate the legacy default Nextcloud hostname from files.<tenant_domain>
