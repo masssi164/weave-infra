@@ -63,9 +63,9 @@ locals {
     mas_upstream          = "${local.service_names.mas}:8080"
     synapse_upstream      = "${local.service_names.synapse}:8008"
     # Backend is routed via Caddy (api_upstream); no Traefik labels needed
-    api_upstream          = "${local.service_names.backend}:${var.backend_container_port}"
-    tls_cert_filename     = basename(local.caddy_tls_cert_file)
-    tls_key_filename      = basename(local.caddy_tls_key_file)
+    api_upstream      = "${local.service_names.backend}:${var.backend_container_port}"
+    tls_cert_filename = basename(local.caddy_tls_cert_file)
+    tls_key_filename  = basename(local.caddy_tls_key_file)
   })
 
   # Backend / Keycloak contract (from #4)
@@ -287,12 +287,12 @@ module "keycloak" {
 module "backend" {
   source = "./modules/backend"
 
-  network_name           = docker_network.weave_network.name
-  container_name         = local.service_names.backend
-  image_name             = var.weave_backend_image
-  host_port              = var.backend_host_port
-  container_port         = var.backend_container_port
-  public_host            = local.public_hosts.api
+  network_name   = docker_network.weave_network.name
+  container_name = local.service_names.backend
+  image_name     = var.weave_backend_image
+  host_port      = var.backend_host_port
+  container_port = var.backend_container_port
+  public_host    = local.public_hosts.api
   # Use internal issuer URL: backend reaches Keycloak via Docker network alias (port 8080)
   # not the host-mapped port. Public URL is documented in KEYCLOAK_CONTRACT.md.
   oidc_issuer_uri        = local.keycloak_internal_issuer_url
