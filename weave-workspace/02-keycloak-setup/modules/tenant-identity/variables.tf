@@ -28,3 +28,16 @@ variable "matrix_mas_client_secret" {
   type        = string
   sensitive   = true
 }
+
+variable "create_test_user" {
+  description = "Create a test user for integration testing. Do not enable in production."
+  type        = bool
+  default     = false
+}
+
+variable "test_user_password" {
+  type        = string
+  description = "Password for the integration test user. Only used when create_test_user is true. Must be passed in as a sensitive variable."
+  sensitive   = true
+  default     = ""
+}

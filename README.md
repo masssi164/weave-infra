@@ -26,6 +26,8 @@ cd weave-workspace
 ./install.sh
 ```
 
+Run `make dev-hosts` from the repository root to print the default `/etc/hosts` line.
+
 `install.sh` supplies sensible local defaults, generates secrets and local TLS certificates when they are not already exported as `TF_VAR_*`, applies both Terraform stages in order, waits for readiness, and bootstraps the Nextcloud `user_oidc` app.
 
 For repeatable local runs, generated bootstrap inputs are persisted in `weave-workspace/.generated/bootstrap.env` and reused on subsequent installs unless you override them explicitly with environment variables.
@@ -70,6 +72,7 @@ Caddy is managed by the Terraform infrastructure stage. `weave-workspace/docker-
 
 - `README.md`: top-level usage and architecture summary.
 - `AGENTS.md`: repository navigation notes for future maintainers.
+- `Makefile`: small local operator helpers such as `make dev-hosts`.
 - `.github/workflows/ci.yml`: GitHub Actions workflow for validation checks.
 - `weave-workspace/install.sh`: end-to-end local bootstrap runbook.
 - `weave-workspace/.env.example`: hostname, port, and Caddy mount defaults for local operators.
@@ -107,6 +110,33 @@ The stack expects these names to resolve to `127.0.0.1`:
 - `matrix.<tenant_domain>`
 - `nextcloud.<tenant_domain>`
 - `api.<tenant_domain>`
+
+Default `/etc/hosts` line:
+
+```text
+127.0.0.1 keycloak.weave.local nextcloud.weave.local matrix.weave.local api.weave.local
+```
+
+MAS is served behind the matrix hostname; no separate `mas.<tenant_domain>` entry is needed.
+
+## Integration Tests
+
+Integration tests should call the backend through the Caddy proxy URL, not the direct backend container port. For the default local stack:
+
+```bash
+export WEAVE_BASE_URL=https://api.weave.local
+export WEAVE_TEST_USERNAME=test@weave.local
+export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.env>'
+```
+
+`WEAVE_BASE_URL` must match the Caddy proxy URL for `api.<tenant_domain>`. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
+
+The test user is disabled by default. Enable it only for local integration testing:
+
+```bash
+cd weave-workspace
+TF_VAR_create_test_user=true ./install.sh
+```
 
 ## Native App Contract
 

@@ -10,11 +10,14 @@ readonly INFRA_DIR="${ROOT_DIR}/01-infrastructure"
 readonly KEYCLOAK_DIR="${ROOT_DIR}/02-keycloak-setup"
 readonly BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
 readonly LOOPBACK_HOST="127.0.0.1"
+readonly TEST_USER_EMAIL="test@weave.local"
 readonly PERSISTED_TF_VARS=(
   TF_VAR_docker_host
   TF_VAR_docker_network_name
   TF_VAR_tenant_slug
   TF_VAR_tenant_domain
+  TF_VAR_create_test_user
+  TF_VAR_test_user_password
   TF_VAR_auth_subdomain
   TF_VAR_matrix_subdomain
   TF_VAR_nextcloud_subdomain
@@ -167,6 +170,14 @@ persist_bootstrap_env() {
       printf 'export %s=%q\n' "${var}" "${!var}" >> "${BOOTSTRAP_ENV_FILE}"
     fi
   done
+
+  if create_test_user_enabled; then
+    {
+      printf 'export WEAVE_BASE_URL=%q\n' "$(integration_test_base_url)"
+      printf 'export WEAVE_TEST_USERNAME=%q\n' "${TEST_USER_EMAIL}"
+      printf 'export WEAVE_TEST_PASSWORD=%q\n' "${TF_VAR_test_user_password}"
+    } >> "${BOOTSTRAP_ENV_FILE}"
+  fi
 }
 
 ensure_mas_signing_key() {
@@ -251,6 +262,21 @@ public_host() {
   printf '%s.%s' "${subdomain}" "${TF_VAR_tenant_domain}"
 }
 
+create_test_user_enabled() {
+  case "${TF_VAR_create_test_user:-false}" in
+    true | TRUE | True | 1)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+integration_test_base_url() {
+  printf '%s://%s%s' "${TF_VAR_public_scheme}" "$(public_host "${TF_VAR_api_subdomain}")" "$(public_port_suffix)"
+}
+
 ensure_generated_directories() {
   mkdir -p \
     "${ROOT_DIR}/.generated" \
@@ -323,6 +349,9 @@ ensure_generated_secrets() {
   set_default_secret TF_VAR_synapse_registration_shared_secret "$(random_base64 32)"
   set_default_secret TF_VAR_synapse_macaroon_secret_key "$(random_base64 32)"
   set_default_secret TF_VAR_synapse_form_secret "$(random_base64 32)"
+  if create_test_user_enabled; then
+    set_default_secret TF_VAR_test_user_password "$(random_base64 16)"
+  fi
   ensure_mas_signing_key
 }
 
@@ -521,6 +550,11 @@ print_summary() {
   log "Nextcloud URL: ${nextcloud_url}"
   log "Weave backend URL: ${backend_url}"
   log "Weave backend health: http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/actuator/health"
+
+  if create_test_user_enabled; then
+    log "Test user: ${TEST_USER_EMAIL} / ${TF_VAR_test_user_password}"
+    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=${TF_VAR_test_user_password}"
+  fi
 }
 
 main() {
