@@ -6,6 +6,7 @@ This repository contains one runnable workspace under `weave-workspace/`.
 
 - `.gitignore`: ignores Terraform state, generated runtime assets, and local work directories.
 - `README.md`: operator-focused overview and bootstrap instructions.
+- `KEYCLOAK_CONTRACT.md`: local realm, client, scope, claim, and audience contract.
 - `.github/AGENTS.md`: GitHub automation and workflow navigation notes.
 - `weave-workspace/.env.example`: local hostname, port, and Caddy mount defaults.
 - `weave-workspace/docker-compose.yml`: Caddy service definition for proxy-only iteration against the Terraform-created network.

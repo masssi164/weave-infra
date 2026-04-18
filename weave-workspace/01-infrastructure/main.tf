@@ -22,6 +22,7 @@ locals {
     db        = "weave-db"
     proxy     = "weave-proxy"
     keycloak  = "weave-keycloak"
+    backend   = "weave-backend"
     mas       = "weave-mas"
     synapse   = "weave-synapse"
     nextcloud = "weave-nextcloud"
@@ -46,6 +47,7 @@ locals {
 
   matrix_mas_upstream_id = "01JQ7N9R4QK6W3M5X8Y2ZC1DHF"
 
+  # Caddy TLS (from #3)
   caddy_tls_cert_file = abspath(coalesce(var.caddy_tls_cert_file, "${path.module}/.generated/caddy/certs/weave.local.pem"))
   caddy_tls_key_file  = abspath(coalesce(var.caddy_tls_key_file, "${path.module}/.generated/caddy/certs/weave.local-key.pem"))
   caddy_tls_ca_file   = abspath(coalesce(var.caddy_tls_ca_file, "${path.module}/.generated/caddy/certs/weave-local-ca.pem"))
@@ -60,10 +62,17 @@ locals {
     nextcloud_upstream    = "${local.service_names.nextcloud}:80"
     mas_upstream          = "${local.service_names.mas}:8080"
     synapse_upstream      = "${local.service_names.synapse}:8008"
-    api_upstream          = var.api_upstream
+    # Backend is routed via Caddy (api_upstream); no Traefik labels needed
+    api_upstream          = "${local.service_names.backend}:${var.backend_container_port}"
     tls_cert_filename     = basename(local.caddy_tls_cert_file)
     tls_key_filename      = basename(local.caddy_tls_key_file)
   })
+
+  # Backend / Keycloak contract (from #4)
+  # public URL for documentation; internal URL for backend container (Docker network routing)
+  keycloak_issuer_url          = "${local.public_urls.keycloak}/realms/${var.tenant_slug}"
+  keycloak_internal_issuer_url = "http://${local.service_names.keycloak}:8080/realms/${var.tenant_slug}"
+  weave_backend_audience       = "weave-backend"
 
   service_databases = {
     keycloak = {
@@ -273,6 +282,23 @@ module "keycloak" {
   admin_username = var.keycloak_admin_username
   admin_password = var.keycloak_admin_password
   depends_on     = [terraform_data.postgres_bootstrap]
+}
+
+module "backend" {
+  source = "./modules/backend"
+
+  network_name           = docker_network.weave_network.name
+  container_name         = local.service_names.backend
+  image_name             = var.weave_backend_image
+  host_port              = var.backend_host_port
+  container_port         = var.backend_container_port
+  public_host            = local.public_hosts.api
+  # Use internal issuer URL: backend reaches Keycloak via Docker network alias (port 8080)
+  # not the host-mapped port. Public URL is documented in KEYCLOAK_CONTRACT.md.
+  oidc_issuer_uri        = local.keycloak_internal_issuer_url
+  oidc_required_audience = local.weave_backend_audience
+  healthcheck_path       = "/actuator/health"
+  depends_on             = [module.keycloak]
 }
 
 module "matrix" {

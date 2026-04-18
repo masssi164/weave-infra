@@ -115,6 +115,24 @@ variable "nextcloud_host_port" {
   default     = 8083
 }
 
+variable "backend_host_port" {
+  description = "Direct host port for the Weave backend."
+  type        = number
+  default     = 8084
+}
+
+variable "backend_container_port" {
+  description = "Internal HTTP port exposed by the Weave backend container."
+  type        = number
+  default     = 8080
+}
+
+variable "weave_backend_image" {
+  description = "Docker image for the Weave backend service."
+  type        = string
+  default     = "ghcr.io/masssi164/weave-backend:latest"
+}
+
 variable "nextcloud_trusted_proxies" {
   description = "Space-separated proxy IPs or CIDRs trusted by Nextcloud."
   type        = string
@@ -179,6 +197,12 @@ variable "nextcloud_image" {
   description = "Nextcloud image."
   type        = string
   default     = "nextcloud:apache"
+}
+
+variable "weave_backend_image" {
+  description = "Weave backend image."
+  type        = string
+  default     = "ghcr.io/masssi164/weave-backend:latest"
 }
 
 variable "db_name" {
