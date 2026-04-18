@@ -18,7 +18,7 @@ Both stages now follow a thin-root pattern:
 Add local host entries before opening any browser-facing URL:
 
 ```text
-127.0.0.1 keycloak.weave.local nextcloud.weave.local matrix.weave.local mas.weave.local api.weave.local
+127.0.0.1 keycloak.weave.local nextcloud.weave.local matrix.weave.local api.weave.local
 ```
 
 ```bash
@@ -108,17 +108,16 @@ The stack expects these names to resolve to `127.0.0.1`:
 
 - `keycloak.<tenant_domain>`
 - `matrix.<tenant_domain>`
-- `mas.<tenant_domain>`
 - `nextcloud.<tenant_domain>`
 - `api.<tenant_domain>`
 
 Default `/etc/hosts` line:
 
 ```text
-127.0.0.1 keycloak.weave.local nextcloud.weave.local matrix.weave.local mas.weave.local api.weave.local
+127.0.0.1 keycloak.weave.local nextcloud.weave.local matrix.weave.local api.weave.local
 ```
 
-`mas.<tenant_domain>` is required for Matrix Authentication Service redirects and health checks when MAS is addressed through its dedicated local hostname.
+MAS is served behind the matrix hostname; no separate `mas.<tenant_domain>` entry is needed.
 
 ## Integration Tests
 
@@ -127,7 +126,7 @@ Integration tests should call the backend through the Caddy proxy URL, not the d
 ```bash
 export WEAVE_BASE_URL=https://api.weave.local
 export WEAVE_TEST_USERNAME=test@weave.local
-export WEAVE_TEST_PASSWORD='Weave1234!'
+export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.env>'
 ```
 
 `WEAVE_BASE_URL` must match the Caddy proxy URL for `api.<tenant_domain>`. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.

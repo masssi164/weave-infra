@@ -12,7 +12,7 @@ locals {
     email      = "test@weave.local"
     first_name = "Test"
     last_name  = "User"
-    password   = "Weave1234!"
+    password   = var.test_user_password
   }
 
   weave_app_optional_scopes = [

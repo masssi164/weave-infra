@@ -34,3 +34,10 @@ variable "create_test_user" {
   type        = bool
   default     = false
 }
+
+variable "test_user_password" {
+  type        = string
+  description = "Password for the integration test user. Only used when create_test_user is true. Must be passed in as a sensitive variable."
+  sensitive   = true
+  default     = ""
+}
