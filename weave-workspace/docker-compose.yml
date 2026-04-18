@@ -1,0 +1,31 @@
+services:
+  caddy:
+    image: ${TF_VAR_proxy_image:-caddy:2.8}
+    container_name: ${WEAVE_CADDY_CONTAINER_NAME:-weave-proxy}
+    restart: unless-stopped
+    ports:
+      - "${TF_VAR_proxy_http_host_port:-80}:80"
+      - "${TF_VAR_proxy_host_port:-443}:443"
+    volumes:
+      - ${WEAVE_CADDYFILE_PATH:-./01-infrastructure/.generated/caddy/Caddyfile}:/etc/caddy/Caddyfile:ro
+      - ${WEAVE_CADDY_CERTS_DIR:-./01-infrastructure/.generated/caddy/certs}:/certs:ro
+      - weave_caddy_data:/data
+      - weave_caddy_config:/config
+    networks:
+      weave:
+        aliases:
+          - ${TF_VAR_auth_subdomain:-keycloak}.${TF_VAR_tenant_domain:-weave.local}
+          - ${TF_VAR_nextcloud_subdomain:-nextcloud}.${TF_VAR_tenant_domain:-weave.local}
+          - ${TF_VAR_matrix_subdomain:-matrix}.${TF_VAR_tenant_domain:-weave.local}
+          - ${TF_VAR_api_subdomain:-api}.${TF_VAR_tenant_domain:-weave.local}
+
+volumes:
+  weave_caddy_data:
+    name: weave_caddy_data
+  weave_caddy_config:
+    name: weave_caddy_config
+
+networks:
+  weave:
+    external: true
+    name: ${TF_VAR_docker_network_name:-weave_network}

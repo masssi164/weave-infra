@@ -23,11 +23,6 @@ variable "host_port" {
   type        = number
 }
 
-variable "public_host" {
-  description = "Browser-facing hostname for Keycloak."
-  type        = string
-}
-
 variable "public_url" {
   description = "Browser-facing URL for Keycloak."
   type        = string

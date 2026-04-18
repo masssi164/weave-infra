@@ -6,16 +6,6 @@ terraform {
   }
 }
 
-locals {
-  traefik_labels = {
-    "traefik.enable"                                                = "true"
-    "traefik.docker.network"                                        = var.network_name
-    "traefik.http.routers.weave-keycloak.rule"                      = "Host(`${var.public_host}`)"
-    "traefik.http.routers.weave-keycloak.entrypoints"               = "web"
-    "traefik.http.services.weave-keycloak.loadbalancer.server.port" = "8080"
-  }
-}
-
 resource "docker_image" "this" {
   name = var.image_name
 }
@@ -56,17 +46,9 @@ resource "docker_container" "this" {
     container_path = "/opt/keycloak/data"
   }
 
-  dynamic "labels" {
-    for_each = local.traefik_labels
-    content {
-      label = labels.key
-      value = labels.value
-    }
-  }
-
   networks_advanced {
     name    = var.network_name
-    aliases = [var.public_host, var.container_name]
+    aliases = [var.container_name]
   }
 
   lifecycle {

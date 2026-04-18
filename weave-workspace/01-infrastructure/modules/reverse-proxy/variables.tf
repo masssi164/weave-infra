@@ -9,16 +9,47 @@ variable "container_name" {
 }
 
 variable "image_name" {
-  description = "Traefik image reference."
+  description = "Caddy image reference."
   type        = string
 }
 
-variable "host_port" {
-  description = "Host port exposed by the reverse proxy."
+variable "http_host_port" {
+  description = "HTTP host port exposed by the reverse proxy."
   type        = number
 }
 
-variable "docker_socket_path" {
-  description = "Host filesystem path to the Docker unix socket mounted into Traefik."
+variable "https_host_port" {
+  description = "HTTPS host port exposed by the reverse proxy."
+  type        = number
+}
+
+variable "caddyfile_path" {
+  description = "Host path to the generated Caddyfile."
   type        = string
+}
+
+variable "certs_dir" {
+  description = "Host directory containing local TLS certificate, private key, and CA certificate files."
+  type        = string
+}
+
+variable "data_volume_name" {
+  description = "Docker volume name used for Caddy runtime data."
+  type        = string
+}
+
+variable "config_volume_name" {
+  description = "Docker volume name used for Caddy runtime config."
+  type        = string
+}
+
+variable "public_hosts" {
+  description = "Public hostnames that should resolve to the reverse proxy on the Docker network."
+  type        = map(string)
+}
+
+variable "docker_socket_path" {
+  description = "Deprecated. Retained only for compatibility with older module callers."
+  type        = string
+  default     = null
 }
