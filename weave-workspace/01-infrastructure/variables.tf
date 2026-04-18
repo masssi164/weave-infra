@@ -199,12 +199,6 @@ variable "nextcloud_image" {
   default     = "nextcloud:apache"
 }
 
-variable "weave_backend_image" {
-  description = "Weave backend image."
-  type        = string
-  default     = "ghcr.io/masssi164/weave-backend:latest"
-}
-
 variable "db_name" {
   description = "Base name used to derive per-service PostgreSQL databases inside the shared PostgreSQL instance."
   type        = string
