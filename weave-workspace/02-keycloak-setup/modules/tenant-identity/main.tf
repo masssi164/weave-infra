@@ -7,6 +7,14 @@ terraform {
 }
 
 locals {
+  test_user = {
+    username   = "test"
+    email      = "test@weave.local"
+    first_name = "Test"
+    last_name  = "User"
+    password   = "Weave1234!"
+  }
+
   weave_app_optional_scopes = [
     "address",
     "microprofile-jwt",
@@ -80,6 +88,23 @@ resource "keycloak_realm" "tenant" {
   edit_username_allowed          = true
   reset_password_allowed         = true
   duplicate_emails_allowed       = false
+}
+
+resource "keycloak_user" "test" {
+  count = var.create_test_user ? 1 : 0
+
+  realm_id       = keycloak_realm.tenant.id
+  username       = local.test_user.username
+  enabled        = true
+  email          = local.test_user.email
+  first_name     = local.test_user.first_name
+  last_name      = local.test_user.last_name
+  email_verified = true
+
+  initial_password {
+    value     = local.test_user.password
+    temporary = false
+  }
 }
 
 resource "keycloak_openid_client" "client" {

@@ -5,16 +5,37 @@ This is the local identity contract for the Weave self-hosted development stack.
 ## Realm
 
 - Realm name: `weave`
-- Default public issuer URI: `http://auth.weave.local:8090/realms/weave`
+- Default public issuer URI: `https://keycloak.weave.local/realms/weave`
 - Terraform source: `weave-workspace/02-keycloak-setup/modules/tenant-identity`
 
 The issuer URI follows the infrastructure inputs:
 
 - `tenant_slug`: realm name, default `weave`
-- `auth_subdomain`: default `auth`
+- `auth_subdomain`: default `keycloak`
 - `tenant_domain`: default `weave.local`
-- `public_scheme`: default `http`
-- `proxy_host_port`: default `8090`
+- `public_scheme`: default `https`
+- `proxy_host_port`: default `443`
+
+## Integration Test User
+
+The Keycloak setup stage can create a local integration test user. It is disabled by default and must not be enabled in production.
+
+Enable it with `TF_VAR_create_test_user=true` when running `weave-workspace/install.sh`, or by setting `create_test_user=true` for the `02-keycloak-setup` Terraform stage.
+
+- Username: `test`
+- Email and login identifier: `test@weave.local`
+- First name: `Test`
+- Last name: `User`
+- Password: `Weave1234!`
+- Email verified: true
+- Temporary password: false
+
+For integration tests, use:
+
+```bash
+export WEAVE_TEST_USERNAME=test@weave.local
+export WEAVE_TEST_PASSWORD='Weave1234!'
+```
 
 ## Clients
 
@@ -104,6 +125,8 @@ The Keycloak setup stage exports:
 - `weave_backend_audience`
 - `nextcloud_client_id`
 - `nextcloud_client_secret`
+- `test_user_username`
+- `test_user_password`
 
 The infrastructure stage exports:
 

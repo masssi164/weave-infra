@@ -53,3 +53,14 @@ output "nextcloud_client_secret" {
   value       = keycloak_openid_client.client["nextcloud"].client_secret
   sensitive   = true
 }
+
+output "test_user_username" {
+  description = "Integration test username when create_test_user is enabled."
+  value       = var.create_test_user ? local.test_user.username : null
+}
+
+output "test_user_password" {
+  description = "Integration test password when create_test_user is enabled."
+  value       = var.create_test_user ? local.test_user.password : null
+  sensitive   = true
+}

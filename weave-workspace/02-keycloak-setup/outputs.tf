@@ -53,3 +53,14 @@ output "nextcloud_client_secret" {
   value       = module.tenant_identity.nextcloud_client_secret
   sensitive   = true
 }
+
+output "test_user_username" {
+  description = "Integration test username when create_test_user is enabled."
+  value       = module.tenant_identity.test_user_username
+}
+
+output "test_user_password" {
+  description = "Integration test password when create_test_user is enabled."
+  value       = module.tenant_identity.test_user_password
+  sensitive   = true
+}

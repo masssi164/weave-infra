@@ -5,6 +5,7 @@ This repository contains one runnable workspace under `weave-workspace/`.
 ## Files
 
 - `.gitignore`: ignores Terraform state, generated runtime assets, and local work directories.
+- `Makefile`: local operator helpers such as printing default host entries.
 - `README.md`: operator-focused overview and bootstrap instructions.
 - `KEYCLOAK_CONTRACT.md`: local realm, client, scope, claim, and audience contract.
 - `.github/AGENTS.md`: GitHub automation and workflow navigation notes.

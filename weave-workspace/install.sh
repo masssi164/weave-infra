@@ -10,11 +10,14 @@ readonly INFRA_DIR="${ROOT_DIR}/01-infrastructure"
 readonly KEYCLOAK_DIR="${ROOT_DIR}/02-keycloak-setup"
 readonly BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
 readonly LOOPBACK_HOST="127.0.0.1"
+readonly TEST_USER_EMAIL="test@weave.local"
+readonly TEST_USER_PASSWORD="Weave1234!"
 readonly PERSISTED_TF_VARS=(
   TF_VAR_docker_host
   TF_VAR_docker_network_name
   TF_VAR_tenant_slug
   TF_VAR_tenant_domain
+  TF_VAR_create_test_user
   TF_VAR_auth_subdomain
   TF_VAR_matrix_subdomain
   TF_VAR_nextcloud_subdomain
@@ -167,6 +170,12 @@ persist_bootstrap_env() {
       printf 'export %s=%q\n' "${var}" "${!var}" >> "${BOOTSTRAP_ENV_FILE}"
     fi
   done
+
+  if create_test_user_enabled; then
+    printf 'export WEAVE_BASE_URL=%q\n' "$(integration_test_base_url)" >> "${BOOTSTRAP_ENV_FILE}"
+    printf 'export WEAVE_TEST_USERNAME=%q\n' "${TEST_USER_EMAIL}" >> "${BOOTSTRAP_ENV_FILE}"
+    printf 'export WEAVE_TEST_PASSWORD=%q\n' "${TEST_USER_PASSWORD}" >> "${BOOTSTRAP_ENV_FILE}"
+  fi
 }
 
 ensure_mas_signing_key() {
@@ -249,6 +258,21 @@ public_port_suffix() {
 public_host() {
   local subdomain="$1"
   printf '%s.%s' "${subdomain}" "${TF_VAR_tenant_domain}"
+}
+
+create_test_user_enabled() {
+  case "${TF_VAR_create_test_user:-false}" in
+    true | TRUE | True | 1)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+integration_test_base_url() {
+  printf '%s://%s%s' "${TF_VAR_public_scheme}" "$(public_host "${TF_VAR_api_subdomain}")" "$(public_port_suffix)"
 }
 
 ensure_generated_directories() {
@@ -507,8 +531,8 @@ print_summary() {
   weave_client_id="$(terraform_output_raw "${KEYCLOAK_DIR}" weave_app_client_id)"
 
   log
-  log "Add these host entries before using the browser-facing URLs:"
-  log "127.0.0.1 $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}") $(public_host "${TF_VAR_api_subdomain}")"
+  log "Add these host entries before using the browser-facing URLs and MAS hostname:"
+  log "127.0.0.1 $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}") $(public_host "mas") $(public_host "${TF_VAR_api_subdomain}")"
   log
   log "Trust this local TLS CA certificate on the host before opening browser URLs:"
   log "${TF_VAR_caddy_tls_ca_file}"
@@ -521,6 +545,11 @@ print_summary() {
   log "Nextcloud URL: ${nextcloud_url}"
   log "Weave backend URL: ${backend_url}"
   log "Weave backend health: http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/actuator/health"
+
+  if create_test_user_enabled; then
+    log "Test user: ${TEST_USER_EMAIL} / ${TEST_USER_PASSWORD}"
+    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=${TEST_USER_PASSWORD}"
+  fi
 }
 
 main() {

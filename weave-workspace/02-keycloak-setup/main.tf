@@ -47,6 +47,7 @@ module "tenant_identity" {
   nextcloud_public_url     = local.public_urls.nextcloud
   matrix_mas_upstream_id   = local.matrix_mas_upstream_id
   matrix_mas_client_secret = var.matrix_mas_client_secret
+  create_test_user         = var.create_test_user
 }
 
 moved {
