@@ -361,7 +361,7 @@ ensure_local_tls_certificates() {
   ca_dir="$(dirname -- "${ca_file}")"
   ca_key_file="${ca_file%.*}-key.pem"
 
-  if [[ "${cert_dir}" != "${key_dir}" || "${cert_dir}" != "${ca_dir}" ]]; then
+  if [[ "${cert_dir}" != "${key_dir}" && "${cert_dir}" != "${ca_dir}" ]]; then
     fail "Caddy TLS cert, key, and CA files must be in the same directory so the Docker cert mount contains all three files."
   fi
 
