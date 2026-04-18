@@ -43,6 +43,16 @@ variable "public_port_suffix" {
   type        = string
 }
 
+variable "trusted_proxies" {
+  description = "Space-separated proxy IPs or CIDRs trusted by Nextcloud."
+  type        = string
+}
+
+variable "certs_dir" {
+  description = "Host directory containing the local CA certificate trusted by Nextcloud outbound HTTPS calls."
+  type        = string
+}
+
 variable "db_host" {
   description = "PostgreSQL host reachable from the container network."
   type        = string

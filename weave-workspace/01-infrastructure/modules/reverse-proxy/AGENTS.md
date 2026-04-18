@@ -1,9 +1,9 @@
 # Reverse Proxy Module Guide
 
-This module owns the Traefik edge container for local hostname-based routing.
+This module owns the Caddy edge container for local HTTPS hostname-based routing.
 
 ## Files
 
-- `main.tf`: Traefik image, Docker socket mount, published port, and container.
-- `variables.tf`: network, image, and host-port inputs.
-- `outputs.tf`: exported proxy container identifier.
+- `main.tf`: Caddy image, Caddyfile mount, TLS cert directory mount, runtime volumes, published HTTP/HTTPS ports, and container.
+- `variables.tf`: network, image, host-port, Caddyfile, TLS cert, and hostname inputs.
+- `outputs.tf`: exported proxy container and volume identifiers.

@@ -35,13 +35,7 @@ variable "tenant_domain" {
 variable "auth_subdomain" {
   description = "Subdomain used for Keycloak."
   type        = string
-  default     = "auth"
-}
-
-variable "mas_subdomain" {
-  description = "Subdomain used for Matrix Authentication Service."
-  type        = string
-  default     = "mas"
+  default     = "keycloak"
 }
 
 variable "matrix_subdomain" {
@@ -65,7 +59,7 @@ variable "api_subdomain" {
 variable "public_scheme" {
   description = "Public URL scheme for browser-facing services."
   type        = string
-  default     = "http"
+  default     = "https"
 
   validation {
     condition     = contains(["http", "https"], var.public_scheme)
@@ -74,9 +68,15 @@ variable "public_scheme" {
 }
 
 variable "proxy_host_port" {
-  description = "Host port exposed by the reverse proxy."
+  description = "HTTPS host port exposed by the reverse proxy."
   type        = number
-  default     = 8090
+  default     = 443
+}
+
+variable "proxy_http_host_port" {
+  description = "HTTP host port exposed by the reverse proxy for HTTP-to-HTTPS redirects."
+  type        = number
+  default     = 80
 }
 
 variable "keycloak_host_port" {
@@ -115,10 +115,40 @@ variable "nextcloud_host_port" {
   default     = 8083
 }
 
-variable "proxy_image" {
-  description = "Traefik image used for the reverse proxy."
+variable "nextcloud_trusted_proxies" {
+  description = "Space-separated proxy IPs or CIDRs trusted by Nextcloud."
   type        = string
-  default     = "traefik:v3.0"
+  default     = "172.16.0.0/12"
+}
+
+variable "proxy_image" {
+  description = "Caddy image used for the reverse proxy."
+  type        = string
+  default     = "caddy:2.8"
+}
+
+variable "caddy_tls_cert_file" {
+  description = "Host path to the local TLS certificate served by Caddy. Keep cert, key, and CA files in the same directory."
+  type        = string
+  default     = null
+}
+
+variable "caddy_tls_key_file" {
+  description = "Host path to the local TLS private key served by Caddy. Keep cert, key, and CA files in the same directory."
+  type        = string
+  default     = null
+}
+
+variable "caddy_tls_ca_file" {
+  description = "Host path to the local CA certificate trusted by containers that call public HTTPS URLs. Keep cert, key, and CA files in the same directory."
+  type        = string
+  default     = null
+}
+
+variable "api_upstream" {
+  description = "Internal upstream address reserved for the future Weave backend API."
+  type        = string
+  default     = "weave-backend:8080"
 }
 
 variable "postgres_image" {

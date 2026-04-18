@@ -6,16 +6,6 @@ terraform {
   }
 }
 
-locals {
-  traefik_labels = {
-    "traefik.enable"                                                 = "true"
-    "traefik.docker.network"                                         = var.network_name
-    "traefik.http.routers.weave-nextcloud.rule"                      = "Host(`${var.public_host}`)"
-    "traefik.http.routers.weave-nextcloud.entrypoints"               = "web"
-    "traefik.http.services.weave-nextcloud.loadbalancer.server.port" = "80"
-  }
-}
-
 resource "docker_image" "this" {
   name = var.image_name
 }
@@ -39,6 +29,7 @@ resource "docker_container" "this" {
     "OVERWRITEHOST=${var.public_host}${var.public_port_suffix}",
     "OVERWRITECLIURL=${var.public_url}",
     "OVERWRITEPROTOCOL=${var.public_scheme}",
+    "TRUSTED_PROXIES=${var.trusted_proxies}",
   ]
 
   ports {
@@ -51,17 +42,15 @@ resource "docker_container" "this" {
     container_path = "/var/www/html"
   }
 
-  dynamic "labels" {
-    for_each = local.traefik_labels
-    content {
-      label = labels.key
-      value = labels.value
-    }
+  volumes {
+    host_path      = var.certs_dir
+    container_path = "/certs"
+    read_only      = true
   }
 
   networks_advanced {
     name    = var.network_name
-    aliases = [var.public_host, var.container_name]
+    aliases = [var.container_name]
   }
 
   lifecycle {

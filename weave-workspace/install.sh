@@ -16,16 +16,20 @@ readonly PERSISTED_TF_VARS=(
   TF_VAR_tenant_slug
   TF_VAR_tenant_domain
   TF_VAR_auth_subdomain
-  TF_VAR_mas_subdomain
   TF_VAR_matrix_subdomain
   TF_VAR_nextcloud_subdomain
   TF_VAR_api_subdomain
   TF_VAR_public_scheme
   TF_VAR_proxy_host_port
+  TF_VAR_proxy_http_host_port
   TF_VAR_keycloak_host_port
   TF_VAR_mas_host_port
   TF_VAR_synapse_host_port
   TF_VAR_nextcloud_host_port
+  TF_VAR_nextcloud_trusted_proxies
+  TF_VAR_caddy_tls_cert_file
+  TF_VAR_caddy_tls_key_file
+  TF_VAR_caddy_tls_ca_file
   TF_VAR_synapse_uid
   TF_VAR_synapse_gid
   TF_VAR_db_name
@@ -140,6 +144,13 @@ load_persisted_env() {
     [[ "${TF_VAR_nextcloud_subdomain:-}" == "files" ]]; then
     export TF_VAR_nextcloud_subdomain="nextcloud"
   fi
+
+  # Migrate the old Keycloak default from auth.<tenant_domain> to
+  # keycloak.<tenant_domain> unless the caller already set a value.
+  if [[ ! " ${preset_names[*]} " =~ " TF_VAR_auth_subdomain " ]] &&
+    [[ "${TF_VAR_auth_subdomain:-}" == "auth" ]]; then
+    export TF_VAR_auth_subdomain="keycloak"
+  fi
 }
 
 persist_bootstrap_env() {
@@ -224,7 +235,8 @@ terraform_output_raw() {
 }
 
 public_port_suffix() {
-  if [[ "${TF_VAR_proxy_host_port}" == "80" || "${TF_VAR_proxy_host_port}" == "443" ]]; then
+  if [[ "${TF_VAR_public_scheme}" == "http" && "${TF_VAR_proxy_host_port}" == "80" ]] ||
+    [[ "${TF_VAR_public_scheme}" == "https" && "${TF_VAR_proxy_host_port}" == "443" ]]; then
     printf ''
   else
     printf ':%s' "${TF_VAR_proxy_host_port}"
@@ -240,6 +252,7 @@ ensure_generated_directories() {
   mkdir -p \
     "${ROOT_DIR}/.generated" \
     "${INFRA_DIR}/.generated/db" \
+    "${INFRA_DIR}/.generated/caddy/certs" \
     "${INFRA_DIR}/.generated/mas" \
     "${INFRA_DIR}/.generated/synapse"
 }
@@ -249,17 +262,18 @@ ensure_default_inputs() {
     "TF_VAR_docker_network_name=weave_network"
     "TF_VAR_tenant_slug=weave"
     "TF_VAR_tenant_domain=weave.local"
-    "TF_VAR_auth_subdomain=auth"
-    "TF_VAR_mas_subdomain=mas"
+    "TF_VAR_auth_subdomain=keycloak"
     "TF_VAR_matrix_subdomain=matrix"
     "TF_VAR_nextcloud_subdomain=nextcloud"
     "TF_VAR_api_subdomain=api"
-    "TF_VAR_public_scheme=http"
-    "TF_VAR_proxy_host_port=8090"
+    "TF_VAR_public_scheme=https"
+    "TF_VAR_proxy_host_port=443"
+    "TF_VAR_proxy_http_host_port=80"
     "TF_VAR_keycloak_host_port=8080"
     "TF_VAR_mas_host_port=8082"
     "TF_VAR_synapse_host_port=8008"
     "TF_VAR_nextcloud_host_port=8083"
+    "TF_VAR_nextcloud_trusted_proxies=172.16.0.0/12"
     "TF_VAR_synapse_uid=991"
     "TF_VAR_synapse_gid=991"
     "TF_VAR_db_name=weave"
@@ -276,6 +290,10 @@ ensure_default_inputs() {
   for entry in "${defaults[@]}"; do
     set_default_var "${entry%%=*}" "${entry#*=}"
   done
+
+  set_default_var TF_VAR_caddy_tls_cert_file "${INFRA_DIR}/.generated/caddy/certs/weave.local.pem"
+  set_default_var TF_VAR_caddy_tls_key_file "${INFRA_DIR}/.generated/caddy/certs/weave.local-key.pem"
+  set_default_var TF_VAR_caddy_tls_ca_file "${INFRA_DIR}/.generated/caddy/certs/weave-local-ca.pem"
 }
 
 ensure_docker_provider_inputs() {
@@ -300,6 +318,104 @@ ensure_generated_secrets() {
   set_default_secret TF_VAR_synapse_macaroon_secret_key "$(random_base64 32)"
   set_default_secret TF_VAR_synapse_form_secret "$(random_base64 32)"
   ensure_mas_signing_key
+}
+
+certificate_alt_names() {
+  local index=1
+  local host
+  local hosts=(
+    "$(public_host "${TF_VAR_auth_subdomain}")"
+    "$(public_host "${TF_VAR_nextcloud_subdomain}")"
+    "$(public_host "${TF_VAR_matrix_subdomain}")"
+    "$(public_host "${TF_VAR_api_subdomain}")"
+  )
+
+  for host in "${hosts[@]}"; do
+    printf 'DNS.%d = %s\n' "${index}" "${host}"
+    index=$((index + 1))
+  done
+}
+
+ensure_local_tls_certificates() {
+  local cert_file="${TF_VAR_caddy_tls_cert_file}"
+  local key_file="${TF_VAR_caddy_tls_key_file}"
+  local ca_file="${TF_VAR_caddy_tls_ca_file}"
+  local cert_dir
+  local key_dir
+  local ca_dir
+  local ca_key_file
+  local csr_file
+  local ext_file
+
+  if [[ -f "${cert_file}" && -f "${key_file}" && -f "${ca_file}" ]]; then
+    return
+  fi
+
+  if [[ -f "${cert_file}" || -f "${key_file}" ]] &&
+    [[ ! -f "${cert_file}" || ! -f "${key_file}" || ! -f "${ca_file}" ]]; then
+    fail "Local TLS cert, key, and CA files must all exist together. Check TF_VAR_caddy_tls_cert_file, TF_VAR_caddy_tls_key_file, and TF_VAR_caddy_tls_ca_file."
+  fi
+
+  cert_dir="$(dirname -- "${cert_file}")"
+  key_dir="$(dirname -- "${key_file}")"
+  ca_dir="$(dirname -- "${ca_file}")"
+  ca_key_file="${ca_file%.*}-key.pem"
+
+  if [[ "${cert_dir}" != "${key_dir}" || "${cert_dir}" != "${ca_dir}" ]]; then
+    fail "Caddy TLS cert, key, and CA files must be in the same directory so the Docker cert mount contains all three files."
+  fi
+
+  mkdir -p "${cert_dir}" "${key_dir}" "${ca_dir}"
+
+  if [[ -f "${ca_file}" && ! -f "${ca_key_file}" ]]; then
+    fail "Existing local CA certificate found at ${ca_file}, but the CA private key is missing at ${ca_key_file}. Provide a matching leaf cert/key or restore the CA key."
+  fi
+
+  if [[ ! -f "${ca_file}" ]]; then
+    openssl genrsa -out "${ca_key_file}" 4096
+    chmod 600 "${ca_key_file}"
+    openssl req -x509 -new -nodes \
+      -key "${ca_key_file}" \
+      -sha256 \
+      -days 3650 \
+      -out "${ca_file}" \
+      -subj "/CN=Weave Local Development CA"
+    chmod 644 "${ca_file}"
+  fi
+
+  csr_file="$(mktemp)"
+  ext_file="$(mktemp)"
+
+  openssl genrsa -out "${key_file}" 2048
+  chmod 600 "${key_file}"
+  openssl req -new \
+    -key "${key_file}" \
+    -out "${csr_file}" \
+    -subj "/CN=$(public_host "${TF_VAR_auth_subdomain}")"
+
+  {
+    printf '%s\n' "authorityKeyIdentifier=keyid,issuer"
+    printf '%s\n' "basicConstraints=CA:FALSE"
+    printf '%s\n' "keyUsage = digitalSignature, keyEncipherment"
+    printf '%s\n' "extendedKeyUsage = serverAuth"
+    printf '%s\n' "subjectAltName = @alt_names"
+    printf '%s\n' ""
+    printf '%s\n' "[alt_names]"
+    certificate_alt_names
+  } > "${ext_file}"
+
+  openssl x509 -req \
+    -in "${csr_file}" \
+    -CA "${ca_file}" \
+    -CAkey "${ca_key_file}" \
+    -CAcreateserial \
+    -out "${cert_file}" \
+    -days 825 \
+    -sha256 \
+    -extfile "${ext_file}"
+  chmod 644 "${cert_file}"
+
+  rm -f -- "${csr_file}" "${ext_file}"
 }
 
 ensure_nextcloud_installed() {
@@ -334,6 +450,15 @@ configure_nextcloud_base_url() {
   occ config:system:set overwritehost --value="${nextcloud_host}$(public_port_suffix)"
   occ config:system:set overwrite.cli.url --value="${nextcloud_url}"
   occ config:system:set overwriteprotocol --value="${TF_VAR_public_scheme}"
+}
+
+install_nextcloud_tls_ca() {
+  local ca_filename
+
+  ca_filename="$(basename -- "${TF_VAR_caddy_tls_ca_file}")"
+  docker exec --user 0 weave-nextcloud \
+    install -m 0644 "/certs/${ca_filename}" "/usr/local/share/ca-certificates/weave-local-ca.crt"
+  docker exec --user 0 weave-nextcloud update-ca-certificates
 }
 
 configure_nextcloud_oidc() {
@@ -377,7 +502,10 @@ print_summary() {
 
   log
   log "Add these host entries before using the browser-facing URLs:"
-  log "127.0.0.1 $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_mas_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_api_subdomain}")"
+  log "127.0.0.1 $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}") $(public_host "${TF_VAR_api_subdomain}")"
+  log
+  log "Trust this local TLS CA certificate on the host before opening browser URLs:"
+  log "${TF_VAR_caddy_tls_ca_file}"
   log
   log "Weave app client ID: ${weave_client_id}"
   log "Weave app sign-in redirect: com.massimotter.weave:/oauthredirect"
@@ -399,6 +527,7 @@ main() {
   ensure_default_inputs
   ensure_docker_provider_inputs
   ensure_generated_secrets
+  ensure_local_tls_certificates
   persist_bootstrap_env
 
   log "Applying infrastructure module..."
@@ -421,6 +550,7 @@ main() {
 
   log "Installing and configuring Nextcloud..."
   ensure_nextcloud_installed
+  install_nextcloud_tls_ca
   configure_nextcloud_base_url
 
   log "Configuring Nextcloud OIDC provider..."

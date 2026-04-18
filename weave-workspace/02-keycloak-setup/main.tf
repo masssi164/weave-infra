@@ -25,7 +25,7 @@ locals {
 
   public_hosts = {
     keycloak  = "${var.auth_subdomain}.${var.tenant_domain}"
-    mas       = "${var.mas_subdomain}.${var.tenant_domain}"
+    matrix    = "${var.matrix_subdomain}.${var.tenant_domain}"
     nextcloud = "${var.nextcloud_subdomain}.${var.tenant_domain}"
     api       = "${var.api_subdomain}.${var.tenant_domain}"
   }
@@ -43,7 +43,7 @@ module "tenant_identity" {
 
   tenant_slug              = var.tenant_slug
   keycloak_public_url      = local.public_urls.keycloak
-  mas_public_url           = local.public_urls.mas
+  mas_public_url           = local.public_urls.matrix
   nextcloud_public_url     = local.public_urls.nextcloud
   matrix_mas_upstream_id   = local.matrix_mas_upstream_id
   matrix_mas_client_secret = var.matrix_mas_client_secret

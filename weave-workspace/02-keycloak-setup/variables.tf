@@ -18,13 +18,13 @@ variable "tenant_domain" {
 variable "auth_subdomain" {
   description = "Subdomain used for Keycloak."
   type        = string
-  default     = "auth"
+  default     = "keycloak"
 }
 
-variable "mas_subdomain" {
-  description = "Subdomain used for Matrix Authentication Service."
+variable "matrix_subdomain" {
+  description = "Subdomain used for Matrix."
   type        = string
-  default     = "mas"
+  default     = "matrix"
 }
 
 variable "nextcloud_subdomain" {
@@ -42,7 +42,7 @@ variable "api_subdomain" {
 variable "public_scheme" {
   description = "Public URL scheme used by browser-facing services."
   type        = string
-  default     = "http"
+  default     = "https"
 
   validation {
     condition     = contains(["http", "https"], var.public_scheme)
@@ -51,9 +51,9 @@ variable "public_scheme" {
 }
 
 variable "proxy_host_port" {
-  description = "Host port exposed by the reverse proxy."
+  description = "HTTPS host port exposed by the reverse proxy."
   type        = number
-  default     = 8090
+  default     = 443
 }
 
 variable "keycloak_host_port" {

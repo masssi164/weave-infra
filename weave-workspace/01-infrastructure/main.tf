@@ -34,7 +34,6 @@ locals {
 
   public_hosts = {
     keycloak  = "${var.auth_subdomain}.${var.tenant_domain}"
-    mas       = "${var.mas_subdomain}.${var.tenant_domain}"
     matrix    = "${var.matrix_subdomain}.${var.tenant_domain}"
     nextcloud = "${var.nextcloud_subdomain}.${var.tenant_domain}"
     api       = "${var.api_subdomain}.${var.tenant_domain}"
@@ -46,7 +45,25 @@ locals {
   }
 
   matrix_mas_upstream_id = "01JQ7N9R4QK6W3M5X8Y2ZC1DHF"
-  docker_socket_path     = trimprefix(var.docker_host, "unix://")
+
+  caddy_tls_cert_file = abspath(coalesce(var.caddy_tls_cert_file, "${path.module}/.generated/caddy/certs/weave.local.pem"))
+  caddy_tls_key_file  = abspath(coalesce(var.caddy_tls_key_file, "${path.module}/.generated/caddy/certs/weave.local-key.pem"))
+  caddy_tls_ca_file   = abspath(coalesce(var.caddy_tls_ca_file, "${path.module}/.generated/caddy/certs/weave-local-ca.pem"))
+  caddy_certs_dir     = dirname(local.caddy_tls_cert_file)
+  caddyfile_path      = "${path.module}/.generated/caddy/Caddyfile"
+  caddyfile_content = templatefile("${path.module}/templates/Caddyfile.tpl", {
+    keycloak_public_host  = local.public_hosts.keycloak
+    nextcloud_public_host = local.public_hosts.nextcloud
+    matrix_public_host    = local.public_hosts.matrix
+    api_public_host       = local.public_hosts.api
+    keycloak_upstream     = "${local.service_names.keycloak}:8080"
+    nextcloud_upstream    = "${local.service_names.nextcloud}:80"
+    mas_upstream          = "${local.service_names.mas}:8080"
+    synapse_upstream      = "${local.service_names.synapse}:8008"
+    api_upstream          = var.api_upstream
+    tls_cert_filename     = basename(local.caddy_tls_cert_file)
+    tls_key_filename      = basename(local.caddy_tls_key_file)
+  })
 
   service_databases = {
     keycloak = {
@@ -114,7 +131,7 @@ generated_files = {
   mas_config = {
     filename = "${path.module}/.generated/mas/config.yaml"
     content = templatefile("${path.module}/templates/mas-config.yaml.tpl", {
-      mas_public_url         = local.public_urls.mas
+      mas_public_url         = local.public_urls.matrix
       mas_db_host            = local.service_names.db
       mas_db_port            = 5432
       mas_db_name            = local.service_databases.mas.database_name
@@ -162,6 +179,12 @@ resource "local_sensitive_file" "generated" {
   filename        = each.value.filename
   content         = each.value.content
   file_permission = "0600"
+}
+
+resource "local_file" "caddyfile" {
+  filename        = local.caddyfile_path
+  content         = local.caddyfile_content
+  file_permission = "0644"
 }
 
 module "postgres" {
@@ -223,8 +246,13 @@ module "reverse_proxy" {
   network_name       = docker_network.weave_network.name
   container_name     = local.service_names.proxy
   image_name         = var.proxy_image
-  host_port          = var.proxy_host_port
-  docker_socket_path = local.docker_socket_path
+  http_host_port     = var.proxy_http_host_port
+  https_host_port    = var.proxy_host_port
+  caddyfile_path     = local_file.caddyfile.filename
+  certs_dir          = local.caddy_certs_dir
+  data_volume_name   = "weave_caddy_data"
+  config_volume_name = "weave_caddy_config"
+  public_hosts       = local.public_hosts
 }
 
 module "keycloak" {
@@ -235,7 +263,6 @@ module "keycloak" {
   image_name     = var.keycloak_image
   volume_name    = "weave_keycloak_data"
   host_port      = var.keycloak_host_port
-  public_host    = local.public_hosts.keycloak
   public_url     = local.public_urls.keycloak
   db_host        = module.postgres.container_name
   db_port        = 5432
@@ -259,7 +286,6 @@ module "matrix" {
   synapse_volume_name    = "weave_synapse_data"
   mas_host_port          = var.mas_host_port
   synapse_host_port      = var.synapse_host_port
-  mas_public_host        = local.public_hosts.mas
   matrix_public_host     = local.public_hosts.matrix
   mas_config_source      = local_sensitive_file.generated["mas_config"].filename
   mas_config_hash        = sha256(local.generated_files["mas_config"].content)
@@ -267,6 +293,8 @@ module "matrix" {
   mas_signing_key_hash   = sha256(local.generated_files["mas_signing_key"].content)
   synapse_config_source  = local_sensitive_file.generated["synapse_homeserver"].filename
   synapse_config_hash    = sha256(local.generated_files["synapse_homeserver"].content)
+  certs_dir              = local.caddy_certs_dir
+  tls_ca_filename        = basename(local.caddy_tls_ca_file)
   synapse_uid            = var.synapse_uid
   synapse_gid            = var.synapse_gid
   depends_on             = [terraform_data.postgres_bootstrap, module.keycloak]
@@ -284,6 +312,8 @@ module "nextcloud" {
   public_url         = local.public_urls.nextcloud
   public_scheme      = var.public_scheme
   public_port_suffix = local.public_port_suffix
+  trusted_proxies    = var.nextcloud_trusted_proxies
+  certs_dir          = local.caddy_certs_dir
   db_host            = module.postgres.container_name
   db_name            = local.service_databases.nextcloud.database_name
   db_username        = var.nextcloud_db_username

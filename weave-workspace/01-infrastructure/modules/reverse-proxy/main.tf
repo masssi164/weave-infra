@@ -10,31 +10,54 @@ resource "docker_image" "this" {
   name = var.image_name
 }
 
+resource "docker_volume" "data" {
+  name = var.data_volume_name
+}
+
+resource "docker_volume" "config" {
+  name = var.config_volume_name
+}
+
 resource "docker_container" "this" {
   name    = var.container_name
   image   = docker_image.this.image_id
   restart = "unless-stopped"
-  command = [
-    "--api=false",
-    "--providers.docker=true",
-    "--providers.docker.exposedbydefault=false",
-    "--entrypoints.web.address=:80",
-  ]
 
   ports {
     internal = 80
-    external = var.host_port
+    external = var.http_host_port
+  }
+
+  ports {
+    internal = 443
+    external = var.https_host_port
   }
 
   volumes {
-    host_path      = var.docker_socket_path
-    container_path = "/var/run/docker.sock"
+    host_path      = var.caddyfile_path
+    container_path = "/etc/caddy/Caddyfile"
     read_only      = true
+  }
+
+  volumes {
+    host_path      = var.certs_dir
+    container_path = "/certs"
+    read_only      = true
+  }
+
+  volumes {
+    volume_name    = docker_volume.data.name
+    container_path = "/data"
+  }
+
+  volumes {
+    volume_name    = docker_volume.config.name
+    container_path = "/config"
   }
 
   networks_advanced {
     name    = var.network_name
-    aliases = [var.container_name]
+    aliases = concat([var.container_name], values(var.public_hosts))
   }
 
   lifecycle {

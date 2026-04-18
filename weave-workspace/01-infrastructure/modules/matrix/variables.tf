@@ -48,11 +48,6 @@ variable "synapse_gid" {
   type        = number
 }
 
-variable "mas_public_host" {
-  description = "Browser-facing hostname for Matrix Authentication Service."
-  type        = string
-}
-
 variable "matrix_public_host" {
   description = "Browser-facing hostname for the Matrix entrypoint."
   type        = string
@@ -85,5 +80,15 @@ variable "synapse_config_source" {
 
 variable "synapse_config_hash" {
   description = "Content hash for the generated Synapse homeserver config."
+  type        = string
+}
+
+variable "certs_dir" {
+  description = "Host directory containing the local CA certificate trusted by MAS outbound HTTPS calls."
+  type        = string
+}
+
+variable "tls_ca_filename" {
+  description = "Filename of the local CA certificate inside certs_dir."
   type        = string
 }
