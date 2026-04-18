@@ -27,7 +27,9 @@ resource "docker_container" "this" {
   restart = "unless-stopped"
   env = [
     "WEAVE_OIDC_ISSUER_URI=${var.oidc_issuer_uri}",
+    "WEAVE_OIDC_JWK_SET_URI=${var.oidc_jwk_set_uri}",
     "WEAVE_OIDC_REQUIRED_AUDIENCE=${var.oidc_required_audience}",
+    "WEAVE_CLIENT_ID=${var.client_id}",
   ]
 
   ports {

@@ -33,8 +33,18 @@ variable "oidc_issuer_uri" {
   type        = string
 }
 
+variable "oidc_jwk_set_uri" {
+  description = "OIDC JWKS URI consumed by the Weave backend."
+  type        = string
+}
+
 variable "oidc_required_audience" {
   description = "Required OIDC audience value enforced by the Weave backend."
+  type        = string
+}
+
+variable "client_id" {
+  description = "Expected authorized-party client ID enforced by the Weave backend."
   type        = string
 }
 

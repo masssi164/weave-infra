@@ -174,6 +174,8 @@ persist_bootstrap_env() {
   if create_test_user_enabled; then
     {
       printf 'export WEAVE_BASE_URL=%q\n' "$(integration_test_base_url)"
+      printf 'export WEAVE_OIDC_ISSUER_URL=%q\n' "$(integration_test_oidc_issuer_url)"
+      printf 'export WEAVE_OIDC_CLIENT_ID=%q\n' "weave-app"
       printf 'export WEAVE_TEST_USERNAME=%q\n' "${TEST_USER_EMAIL}"
       printf 'export WEAVE_TEST_PASSWORD=%q\n' "${TF_VAR_test_user_password}"
     } >> "${BOOTSTRAP_ENV_FILE}"
@@ -275,6 +277,10 @@ create_test_user_enabled() {
 
 integration_test_base_url() {
   printf '%s://%s%s' "${TF_VAR_public_scheme}" "$(public_host "${TF_VAR_api_subdomain}")" "$(public_port_suffix)"
+}
+
+integration_test_oidc_issuer_url() {
+  printf '%s://%s%s/realms/%s' "${TF_VAR_public_scheme}" "$(public_host "${TF_VAR_auth_subdomain}")" "$(public_port_suffix)" "${TF_VAR_tenant_slug}"
 }
 
 ensure_generated_directories() {
@@ -527,12 +533,14 @@ configure_nextcloud_oidc() {
 print_summary() {
   local suffix
   local backend_url
+  local issuer_url
   local nextcloud_url
   local weave_client_id
 
   suffix="$(public_port_suffix)"
   nextcloud_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_nextcloud_subdomain}")${suffix}"
   backend_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_api_subdomain}")${suffix}"
+  issuer_url="$(integration_test_oidc_issuer_url)"
   weave_client_id="$(terraform_output_raw "${KEYCLOAK_DIR}" weave_app_client_id)"
 
   log
@@ -553,7 +561,7 @@ print_summary() {
 
   if create_test_user_enabled; then
     log "Test user: ${TEST_USER_EMAIL} / ${TF_VAR_test_user_password}"
-    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=${TF_VAR_test_user_password}"
+    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_OIDC_ISSUER_URL=${issuer_url} WEAVE_OIDC_CLIENT_ID=${weave_client_id} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=${TF_VAR_test_user_password}"
   fi
 }
 

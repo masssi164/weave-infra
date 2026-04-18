@@ -26,9 +26,19 @@ output "weave_backend_oidc_issuer_uri" {
   value       = local.keycloak_issuer_url
 }
 
+output "weave_backend_oidc_jwk_set_uri" {
+  description = "OIDC JWKS URI configured for the Weave backend."
+  value       = local.keycloak_jwk_set_uri
+}
+
 output "weave_backend_required_audience" {
   description = "OIDC audience value configured for the Weave backend."
   value       = local.weave_backend_audience
+}
+
+output "weave_backend_client_id" {
+  description = "OIDC client ID configured for Weave backend authorized-party validation."
+  value       = local.weave_app_client_id
 }
 
 output "service_names" {

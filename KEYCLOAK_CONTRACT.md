@@ -37,18 +37,27 @@ export WEAVE_TEST_USERNAME=test@weave.local
 export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.env>'
 ```
 
+`install.sh` also writes non-secret Flutter integration settings when the test user is enabled:
+
+```bash
+export WEAVE_BASE_URL=https://api.weave.local
+export WEAVE_OIDC_ISSUER_URL=https://keycloak.weave.local/realms/weave
+export WEAVE_OIDC_CLIENT_ID=weave-app
+```
+
 ## Clients
 
 ### Weave Mobile App
 
 - Keycloak display name: `weave-app`
-- OIDC client ID: `com.massimotter.weave`
+- OIDC client ID: `weave-app`
 - Access type: public
 - OAuth flow: authorization code
 - PKCE: required, `S256`
 - Sign-in redirect URI: `com.massimotter.weave:/oauthredirect`
 - Post-logout redirect URI: `com.massimotter.weave:/logout`
 - Optional API scope: `weave:workspace`
+- Resource Owner Password Grant: disabled by default, enabled only when `create_test_user=true`
 
 The Flutter app must request `openid profile email weave:workspace` when it needs API tokens for the backend.
 
@@ -56,10 +65,13 @@ The Flutter app must request `openid profile email weave:workspace` when it need
 
 - Keycloak client ID: `weave-backend`
 - Access type: bearer-only
-- Expected token audience: `weave-backend`
+- Expected token audience: `weave-app`
+- Expected token `azp` or `client_id`: `weave-app`
 - Backend environment:
   - `WEAVE_OIDC_ISSUER_URI=https://keycloak.weave.local/realms/weave`
-  - `WEAVE_OIDC_REQUIRED_AUDIENCE=weave-backend`
+  - `WEAVE_OIDC_JWK_SET_URI=http://weave-keycloak:8080/realms/weave/protocol/openid-connect/certs`
+  - `WEAVE_OIDC_REQUIRED_AUDIENCE=weave-app`
+  - `WEAVE_CLIENT_ID=weave-app`
 - Public API URL: `https://api.weave.local`
 - Direct health URL: `http://127.0.0.1:8084/actuator/health`
 
@@ -85,14 +97,14 @@ The Flutter app must request `openid profile email weave:workspace` when it need
 
 - Type: OpenID client scope
 - `include_in_token_scope`: true
-- Assigned to `com.massimotter.weave` as an optional scope
+- Assigned to `weave-app` as an optional scope
 - Purpose: API access scope for Weave workspace operations
 
 The scope carries an audience mapper:
 
-- Mapper name: `weave-backend-audience`
+- Mapper name: `weave-app-audience`
 - Mapper type: OIDC audience protocol mapper
-- Included client audience: `weave-backend`
+- Included client audience: `weave-app`
 - Added to access token: true
 - Added to ID token: false
 
@@ -101,14 +113,16 @@ The scope carries an audience mapper:
 A mobile access token requested with `weave:workspace` must include:
 
 - `iss`: `https://keycloak.weave.local/realms/weave`
-- `azp`: `com.massimotter.weave`
-- `aud`: includes `weave-backend`
+- `azp`: `weave-app`
+- `client_id`: `weave-app` when present
+- `aud`: includes `weave-app`
 - `scope`: includes `openid`, requested profile scopes, and `weave:workspace`
 
 The backend accepts the token only when:
 
 - the issuer matches `WEAVE_OIDC_ISSUER_URI`
 - the `aud` claim includes `WEAVE_OIDC_REQUIRED_AUDIENCE`
+- the authorized party or client ID matches `WEAVE_CLIENT_ID`
 
 ## Terraform Outputs
 
@@ -131,6 +145,8 @@ The Keycloak setup stage exports:
 The infrastructure stage exports:
 
 - `weave_backend_oidc_issuer_uri`
+- `weave_backend_oidc_jwk_set_uri`
 - `weave_backend_required_audience`
+- `weave_backend_client_id`
 - `public_urls.api`
 - `service_names.backend`

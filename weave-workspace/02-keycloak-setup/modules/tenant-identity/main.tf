@@ -39,12 +39,13 @@ locals {
 
   client_specs = {
     weave_app = merge(local.client_defaults, {
-      name                       = "weave-app"
-      client_id                  = "com.massimotter.weave"
-      access_type                = "PUBLIC"
-      standard_flow_enabled      = true
-      pkce_code_challenge_method = "S256"
-      valid_redirect_uris        = ["com.massimotter.weave:/oauthredirect"]
+      name                         = "weave-app"
+      client_id                    = "weave-app"
+      access_type                  = "PUBLIC"
+      standard_flow_enabled        = true
+      direct_access_grants_enabled = var.create_test_user
+      pkce_code_challenge_method   = "S256"
+      valid_redirect_uris          = ["com.massimotter.weave:/oauthredirect"]
       valid_post_logout_redirect_uris = [
         "com.massimotter.weave:/logout",
       ]
@@ -138,8 +139,8 @@ resource "keycloak_openid_client_scope" "weave_workspace" {
 resource "keycloak_openid_audience_protocol_mapper" "weave_backend_audience" {
   realm_id                 = keycloak_realm.tenant.id
   client_scope_id          = keycloak_openid_client_scope.weave_workspace.id
-  name                     = "weave-backend-audience"
-  included_client_audience = keycloak_openid_client.client["weave_backend"].client_id
+  name                     = "weave-app-audience"
+  included_client_audience = keycloak_openid_client.client["weave_app"].client_id
   add_to_id_token          = false
   add_to_access_token      = true
 }

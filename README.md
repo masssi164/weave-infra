@@ -88,7 +88,7 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>_synapse`
 - `<db_name>_nextcloud`
 
-The Weave backend is deployed as `weave-backend`, routed at `api.<tenant_domain>`, and configured with the tenant Keycloak issuer plus a required `weave-backend` token audience. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`.
+The Weave backend is deployed as `weave-backend`, routed at `api.<tenant_domain>`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`.
 
 ## Validation
 
@@ -125,11 +125,13 @@ Integration tests should call the backend through the Caddy proxy URL, not the d
 
 ```bash
 export WEAVE_BASE_URL=https://api.weave.local
+export WEAVE_OIDC_ISSUER_URL=https://keycloak.weave.local/realms/weave
+export WEAVE_OIDC_CLIENT_ID=weave-app
 export WEAVE_TEST_USERNAME=test@weave.local
 export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.env>'
 ```
 
-`WEAVE_BASE_URL` must match the Caddy proxy URL for `api.<tenant_domain>`. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
+`WEAVE_BASE_URL` must match the Caddy proxy URL for `api.<tenant_domain>`, and `WEAVE_OIDC_ISSUER_URL` must match the public Keycloak issuer used in access tokens. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
 
 The test user is disabled by default. Enable it only for local integration testing:
 
@@ -143,15 +145,18 @@ TF_VAR_create_test_user=true ./install.sh
 The default Keycloak client contract for the Weave mobile app is:
 
 - Keycloak display name: `weave-app`
-- OIDC client ID: `com.massimotter.weave`
+- OIDC client ID: `weave-app`
 - sign-in redirect URI: `com.massimotter.weave:/oauthredirect`
 - post-logout redirect URI: `com.massimotter.weave:/logout`
 - optional API scope: `weave:workspace`
+- Resource Owner Password Grant: disabled by default, enabled only when `TF_VAR_create_test_user=true`
 
 The backend resource server contract is:
 
-- issuer URI: `http://auth.weave.local:8090/realms/weave`
-- required audience: `weave-backend`
+- issuer URI: `https://keycloak.weave.local/realms/weave`
+- JWKS URI: `http://weave-keycloak:8080/realms/weave/protocol/openid-connect/certs`
+- required audience: `weave-app`
+- expected client ID / authorized party: `weave-app`
 - health endpoint: `http://127.0.0.1:8084/actuator/health`
 
 See `KEYCLOAK_CONTRACT.md` for the full realm, client, scope, claim, and audience contract.
