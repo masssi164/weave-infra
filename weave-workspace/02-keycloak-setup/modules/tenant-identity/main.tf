@@ -7,6 +7,14 @@ terraform {
 }
 
 locals {
+  weave_app_optional_scopes = [
+    "address",
+    "microprofile-jwt",
+    "offline_access",
+    "phone",
+    "weave:workspace",
+  ]
+
   client_defaults = {
     enabled                             = true
     standard_flow_enabled               = false
@@ -24,7 +32,7 @@ locals {
   client_specs = {
     weave_app = merge(local.client_defaults, {
       name                       = "weave-app"
-      client_id                  = "weave-app"
+      client_id                  = "com.massimotter.weave"
       access_type                = "PUBLIC"
       standard_flow_enabled      = true
       pkce_code_challenge_method = "S256"
@@ -93,6 +101,33 @@ resource "keycloak_openid_client" "client" {
   web_origins                         = each.value.web_origins
   backchannel_logout_url              = each.value.backchannel_logout_url
   backchannel_logout_session_required = each.value.backchannel_logout_session_required
+}
+
+resource "keycloak_openid_client_scope" "weave_workspace" {
+  realm_id               = keycloak_realm.tenant.id
+  name                   = "weave:workspace"
+  description            = "Grants Weave mobile clients access to workspace APIs."
+  include_in_token_scope = true
+}
+
+resource "keycloak_openid_audience_protocol_mapper" "weave_backend_audience" {
+  realm_id                 = keycloak_realm.tenant.id
+  client_scope_id          = keycloak_openid_client_scope.weave_workspace.id
+  name                     = "weave-backend-audience"
+  included_client_audience = keycloak_openid_client.client["weave_backend"].client_id
+  add_to_id_token          = false
+  add_to_access_token      = true
+}
+
+resource "keycloak_openid_client_optional_scopes" "weave_app" {
+  realm_id  = keycloak_realm.tenant.id
+  client_id = keycloak_openid_client.client["weave_app"].id
+
+  optional_scopes = local.weave_app_optional_scopes
+
+  depends_on = [
+    keycloak_openid_client_scope.weave_workspace,
+  ]
 }
 
 resource "keycloak_openid_group_membership_protocol_mapper" "nextcloud_groups" {

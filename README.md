@@ -85,6 +85,8 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>_synapse`
 - `<db_name>_nextcloud`
 
+The Weave backend is deployed as `weave-backend`, routed at `api.<tenant_domain>`, and configured with the tenant Keycloak issuer plus a required `weave-backend` token audience. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`.
+
 ## Validation
 
 Current validation flow:
@@ -110,6 +112,16 @@ The stack expects these names to resolve to `127.0.0.1`:
 
 The default Keycloak client contract for the Weave mobile app is:
 
-- client ID: `weave-app`
+- Keycloak display name: `weave-app`
+- OIDC client ID: `com.massimotter.weave`
 - sign-in redirect URI: `com.massimotter.weave:/oauthredirect`
 - post-logout redirect URI: `com.massimotter.weave:/logout`
+- optional API scope: `weave:workspace`
+
+The backend resource server contract is:
+
+- issuer URI: `http://auth.weave.local:8090/realms/weave`
+- required audience: `weave-backend`
+- health endpoint: `http://127.0.0.1:8084/actuator/health`
+
+See `KEYCLOAK_CONTRACT.md` for the full realm, client, scope, claim, and audience contract.

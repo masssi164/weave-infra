@@ -21,6 +21,16 @@ output "nextcloud_database_name" {
   value       = local.service_databases.nextcloud.database_name
 }
 
+output "weave_backend_oidc_issuer_uri" {
+  description = "OIDC issuer URI configured for the Weave backend."
+  value       = local.keycloak_issuer_url
+}
+
+output "weave_backend_required_audience" {
+  description = "OIDC audience value configured for the Weave backend."
+  value       = local.weave_backend_audience
+}
+
 output "service_names" {
   description = "Stable internal Docker service names used by the stack."
   value       = local.service_names

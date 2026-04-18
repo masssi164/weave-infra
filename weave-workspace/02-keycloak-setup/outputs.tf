@@ -23,9 +23,24 @@ output "weave_app_redirect_uris" {
   value       = module.tenant_identity.weave_app_redirect_uris
 }
 
+output "weave_app_optional_scopes" {
+  description = "Optional scopes assigned to the Weave mobile app."
+  value       = module.tenant_identity.weave_app_optional_scopes
+}
+
 output "weave_backend_client_id" {
   description = "Client ID configured for the Weave backend."
   value       = module.tenant_identity.weave_backend_client_id
+}
+
+output "weave_backend_audience" {
+  description = "Audience value emitted for Weave backend access tokens."
+  value       = module.tenant_identity.weave_backend_audience
+}
+
+output "weave_workspace_scope_name" {
+  description = "Client scope that adds the Weave backend audience."
+  value       = module.tenant_identity.weave_workspace_scope_name
 }
 
 output "nextcloud_client_id" {

@@ -23,9 +23,24 @@ output "weave_app_redirect_uris" {
   value       = keycloak_openid_client.client["weave_app"].valid_redirect_uris
 }
 
+output "weave_app_optional_scopes" {
+  description = "Optional scopes assigned to the Weave mobile app."
+  value       = keycloak_openid_client_optional_scopes.weave_app.optional_scopes
+}
+
 output "weave_backend_client_id" {
   description = "Client ID configured for the Weave backend."
   value       = keycloak_openid_client.client["weave_backend"].client_id
+}
+
+output "weave_backend_audience" {
+  description = "Audience value emitted for Weave backend access tokens."
+  value       = keycloak_openid_client.client["weave_backend"].client_id
+}
+
+output "weave_workspace_scope_name" {
+  description = "Client scope that adds the Weave backend audience."
+  value       = keycloak_openid_client_scope.weave_workspace.name
 }
 
 output "nextcloud_client_id" {

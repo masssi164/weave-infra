@@ -30,6 +30,9 @@ readonly PERSISTED_TF_VARS=(
   TF_VAR_caddy_tls_cert_file
   TF_VAR_caddy_tls_key_file
   TF_VAR_caddy_tls_ca_file
+  TF_VAR_backend_host_port
+  TF_VAR_backend_container_port
+  TF_VAR_weave_backend_image
   TF_VAR_synapse_uid
   TF_VAR_synapse_gid
   TF_VAR_db_name
@@ -274,6 +277,9 @@ ensure_default_inputs() {
     "TF_VAR_synapse_host_port=8008"
     "TF_VAR_nextcloud_host_port=8083"
     "TF_VAR_nextcloud_trusted_proxies=172.16.0.0/12"
+    "TF_VAR_backend_host_port=8084"
+    "TF_VAR_backend_container_port=8080"
+    "TF_VAR_weave_backend_image=ghcr.io/masssi164/weave-backend:latest"
     "TF_VAR_synapse_uid=991"
     "TF_VAR_synapse_gid=991"
     "TF_VAR_db_name=weave"
@@ -513,7 +519,8 @@ print_summary() {
   log "Keycloak admin: ${TF_VAR_keycloak_admin_username} / ${TF_VAR_keycloak_admin_password}"
   log "Nextcloud admin: ${TF_VAR_nextcloud_admin_username} / ${TF_VAR_nextcloud_admin_password}"
   log "Nextcloud URL: ${nextcloud_url}"
-  log "Reserved backend URL: ${backend_url}"
+  log "Weave backend URL: ${backend_url}"
+  log "Weave backend health: http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/actuator/health"
 }
 
 main() {
@@ -538,6 +545,9 @@ main() {
 
   log "Applying Keycloak configuration module..."
   terraform_apply "${KEYCLOAK_DIR}"
+
+  log "Waiting for Weave backend readiness..."
+  wait_for_http_200 "Weave backend" "http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/actuator/health"
 
   log "Waiting for Matrix Authentication Service readiness..."
   wait_for_http_200 "Matrix Authentication Service" "http://${LOOPBACK_HOST}:${TF_VAR_mas_host_port}/health"

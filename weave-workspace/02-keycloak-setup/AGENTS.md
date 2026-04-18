@@ -6,7 +6,7 @@ This stage owns tenant-level identity configuration after Keycloak is already ru
 
 - `main.tf`: provider configuration, derived URLs, child module call, and `moved` blocks.
 - `variables.tf`: public input contract for the Keycloak setup stage.
-- `outputs.tf`: realm and client outputs consumed by operators and `install.sh`.
+- `outputs.tf`: realm, client, scope, and audience outputs consumed by operators and `install.sh`.
 - `.terraform.lock.hcl`: pinned provider selections for reproducible init behavior.
 - `modules/AGENTS.md`: map of the child module used by this stage.
 

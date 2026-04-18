@@ -19,6 +19,11 @@ These child modules keep the root stage orchestration-only.
   - `main.tf`: Keycloak image, volume, container, and public URL wiring.
   - `variables.tf`: database, hostname, and admin inputs.
   - `outputs.tf`: container and volume identifiers.
+- `backend/`
+  - `AGENTS.md`: module summary and ownership notes.
+  - `main.tf`: Weave backend image, container, healthcheck, OIDC environment, and Traefik labels.
+  - `variables.tf`: image, port, hostname, and OIDC contract inputs.
+  - `outputs.tf`: container identifier.
 - `matrix/`
   - `AGENTS.md`: module summary and ownership notes.
   - `main.tf`: MAS and Synapse images, Synapse volume, containers, and MAS local CA trust.
