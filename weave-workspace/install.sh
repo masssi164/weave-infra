@@ -119,6 +119,7 @@ load_persisted_env() {
 
   local var
   local index
+  local preset_names_joined=""
   local -a preset_names=()
   local -a preset_values=()
 
@@ -136,9 +137,13 @@ load_persisted_env() {
     export "${preset_names[$index]}=${preset_values[$index]}"
   done
 
+  if (( ${#preset_names[@]} > 0 )); then
+    preset_names_joined=" ${preset_names[*]} "
+  fi
+
   # Preserve compatibility with older bootstrap environments that used
   # TF_VAR_files_subdomain before the contract was renamed.
-  if [[ ! " ${preset_names[*]} " =~ " TF_VAR_nextcloud_subdomain " ]] &&
+  if [[ ! "${preset_names_joined}" =~ " TF_VAR_nextcloud_subdomain " ]] &&
     [[ -n "${TF_VAR_files_subdomain:-}" ]]; then
     export TF_VAR_nextcloud_subdomain="${TF_VAR_files_subdomain}"
     unset TF_VAR_files_subdomain
@@ -146,14 +151,14 @@ load_persisted_env() {
 
   # Migrate the legacy default Nextcloud hostname from files.<tenant_domain>
   # to nextcloud.<tenant_domain> unless the caller already set a value.
-  if [[ ! " ${preset_names[*]} " =~ " TF_VAR_nextcloud_subdomain " ]] &&
+  if [[ ! "${preset_names_joined}" =~ " TF_VAR_nextcloud_subdomain " ]] &&
     [[ "${TF_VAR_nextcloud_subdomain:-}" == "files" ]]; then
     export TF_VAR_nextcloud_subdomain="nextcloud"
   fi
 
   # Migrate the old Keycloak default from auth.<tenant_domain> to
   # keycloak.<tenant_domain> unless the caller already set a value.
-  if [[ ! " ${preset_names[*]} " =~ " TF_VAR_auth_subdomain " ]] &&
+  if [[ ! "${preset_names_joined}" =~ " TF_VAR_auth_subdomain " ]] &&
     [[ "${TF_VAR_auth_subdomain:-}" == "auth" ]]; then
     export TF_VAR_auth_subdomain="keycloak"
   fi
@@ -248,6 +253,39 @@ terraform_output_raw() {
   local name="$2"
 
   terraform -chdir="${dir}" output -raw "${name}"
+}
+
+refresh_backend_container_if_image_changed() {
+  local desired_image="${TF_VAR_weave_backend_image:-}"
+  local desired_image_id
+  local current_image_id
+
+  if [[ -z "${desired_image}" ]]; then
+    return
+  fi
+
+  if ! docker image inspect "${desired_image}" >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! docker container inspect weave-backend >/dev/null 2>&1; then
+    log "Recreating missing Weave backend container for image ${desired_image}..."
+    terraform -chdir="${INFRA_DIR}" init -input=false
+    terraform -chdir="${INFRA_DIR}" apply -input=false -auto-approve
+    return
+  fi
+
+  desired_image_id="$(docker image inspect --format '{{.Id}}' "${desired_image}")"
+  current_image_id="$(docker inspect --format '{{.Image}}' weave-backend)"
+
+  if [[ "${desired_image_id}" == "${current_image_id}" ]]; then
+    return
+  fi
+
+  log "Refreshing Weave backend container to match image ${desired_image}..."
+  docker rm -f weave-backend >/dev/null
+  terraform -chdir="${INFRA_DIR}" init -input=false
+  terraform -chdir="${INFRA_DIR}" apply -input=false -auto-approve
 }
 
 public_port_suffix() {
@@ -581,6 +619,7 @@ main() {
 
   log "Applying infrastructure module..."
   terraform_apply "${INFRA_DIR}"
+  refresh_backend_container_if_image_changed
 
   log "Waiting for Keycloak readiness..."
   wait_for_http_200 "Keycloak" "http://${LOOPBACK_HOST}:${TF_VAR_keycloak_host_port}/health/ready"
