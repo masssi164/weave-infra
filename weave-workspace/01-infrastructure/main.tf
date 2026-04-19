@@ -52,7 +52,7 @@ locals {
   caddy_tls_key_file  = abspath(coalesce(var.caddy_tls_key_file, "${path.module}/.generated/caddy/certs/weave.local-key.pem"))
   caddy_tls_ca_file   = abspath(coalesce(var.caddy_tls_ca_file, "${path.module}/.generated/caddy/certs/weave-local-ca.pem"))
   caddy_certs_dir     = dirname(local.caddy_tls_cert_file)
-  caddyfile_path      = "${path.module}/.generated/caddy/Caddyfile"
+  caddyfile_path      = abspath("${path.module}/.generated/caddy/Caddyfile")
   caddyfile_content = templatefile("${path.module}/templates/Caddyfile.tpl", {
     keycloak_public_host  = local.public_hosts.keycloak
     nextcloud_public_host = local.public_hosts.nextcloud
