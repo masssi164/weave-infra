@@ -9,7 +9,7 @@ output "public_urls" {
 }
 
 output "database_names" {
-  description = "Per-service PostgreSQL database names created inside the shared PostgreSQL instance."
+  description = "Runtime PostgreSQL database name used by each service inside the shared PostgreSQL instance."
   value = {
     for service, config in local.service_databases :
     service => config.database_name
@@ -17,7 +17,7 @@ output "database_names" {
 }
 
 output "nextcloud_database_name" {
-  description = "Nextcloud database name inside the shared PostgreSQL instance."
+  description = "PostgreSQL database name used by Nextcloud inside the shared PostgreSQL instance."
   value       = local.service_databases.nextcloud.database_name
 }
 

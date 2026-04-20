@@ -10,7 +10,7 @@ Both stages now follow a thin-root pattern:
 - root modules own provider setup, shared locals, generated files, and cross-module composition
 - child modules own single service domains with explicit inputs and outputs
 - `moved` blocks preserve state continuity from the earlier flat layout
-- one shared PostgreSQL container now hosts separate per-service databases, which keeps MAS on `public` tables and gives Synapse its required `C` collation database
+- one shared PostgreSQL container now hosts the Weave runtime databases, with Nextcloud kept in the persisted `nextcloud` schema inside the shared `weave` database for release-safe local continuity
 - Caddy terminates local HTTPS for the public service hostnames with a local CA certificate
 
 ## Quick Start
@@ -87,7 +87,7 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>_keycloak`
 - `<db_name>_mas`
 - `<db_name>_synapse`
-- `<db_name>_nextcloud`
+- `<db_name>` (Nextcloud stores its tables in schema `nextcloud` here)
 
 The Weave backend is deployed as `weave-backend`, routed at `api.<tenant_domain>`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`.
 

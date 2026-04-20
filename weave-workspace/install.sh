@@ -560,6 +560,9 @@ configure_nextcloud_oidc() {
     allow_insecure_http=1
   fi
 
+  # The OIDC provider is reached via the local reverse proxy hostname on the Docker network.
+  # Nextcloud blocks RFC1918 / local-address targets by default, which breaks discovery in local dev.
+  occ config:system:set allow_local_remote_servers --type=bool --value=true
   occ config:app:set --type=boolean --value="${allow_insecure_http}" user_oidc allow_insecure_http
   occ user_oidc:provider keycloak \
     --clientid="${nextcloud_client_id}" \

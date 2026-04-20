@@ -116,6 +116,19 @@ curl_status() {
     "$url"
 }
 
+curl_location() {
+  local url="$1"
+  local host_port
+
+  host_port="$(host_port_from_url "${url}")"
+  curl --silent --show-error \
+    --cacert "${CADDY_TLS_CA_FILE}" \
+    --resolve "${host_port}:127.0.0.1" \
+    -o /dev/null \
+    -D - \
+    "$url" | grep -im1 '^location:' | cut -d' ' -f2- | tr -d '\r'
+}
+
 assert_json() {
   local json="$1"
   local jq_filter="$2"
@@ -175,6 +188,8 @@ assert_json "${nextcloud_providers}" ".identifier == \"keycloak\"" "Nextcloud sh
 assert_json "${nextcloud_providers}" ".clientId == \"nextcloud\"" "Nextcloud provider client ID should stay aligned"
 assert_json "${nextcloud_providers}" ".discoveryEndpoint == \"${WEAVE_OIDC_ISSUER_URL}/.well-known/openid-configuration\"" "Nextcloud should point at the public Keycloak discovery URL"
 assert_json "${nextcloud_providers}" '.settings.groupProvisioning == true' "Nextcloud group provisioning should remain enabled"
+nextcloud_oidc_redirect="$(curl_location "$(public_url "${TF_VAR_nextcloud_subdomain:-nextcloud}")/apps/user_oidc/login/1")"
+[[ "${nextcloud_oidc_redirect}" == https://keycloak* ]] || fail "Smoke check failed: Nextcloud OIDC login should redirect to Keycloak, got '${nextcloud_oidc_redirect}'"
 
 log "Checking Matrix auth routing and MAS wiring..."
 matrix_base_url="$(public_url "${TF_VAR_matrix_subdomain:-matrix}")"
