@@ -1,6 +1,6 @@
 # Weave Infrastructure
 
-Terraform code for a local Weave development stack split into two stages:
+Terraform code for a Weave stack split into two stages:
 
 - `weave-workspace/01-infrastructure` provisions Docker networking, runtime assets, and containers.
 - `weave-workspace/02-keycloak-setup` configures the tenant realm and OIDC clients after Keycloak is reachable.
@@ -70,12 +70,15 @@ Caddy is managed by the Terraform infrastructure stage. `weave-workspace/docker-
 
 ## Layout
 
-- `README.md`: top-level usage and architecture summary.
+- `README.md`: top-level usage, local bootstrap, and Release 1 operator summary.
 - `AGENTS.md`: repository navigation notes for future maintainers.
 - `Makefile`: small local operator helpers such as `make dev-hosts`.
 - `.github/workflows/ci.yml`: GitHub Actions workflow for validation checks plus full-stack smoke coverage.
-- `weave-workspace/install.sh`: end-to-end local bootstrap runbook.
-- `weave-workspace/smoke-test.sh`: release-critical stack contract smoke test.
+- `docs/release-1-single-host.md`: Release 1 single-host deployment target, required inputs, and operator expectations.
+- `weave-workspace/install.sh`: end-to-end bootstrap runbook for both local and single-host deployments.
+- `weave-workspace/smoke-test.sh`: local full-stack smoke test that requires the optional test user flow.
+- `weave-workspace/release-verify.sh`: public endpoint verification script for non-local Release 1 installs.
+- `weave-workspace/release.env.example`: operator-facing env template for single-host Release 1 deployments.
 - `weave-workspace/.env.example`: hostname, port, and Caddy mount defaults for local operators.
 - `weave-workspace/docker-compose.yml`: Caddy service definition for proxy-only iteration.
 - `weave-workspace/01-infrastructure`: Docker and generated runtime configuration stage.
@@ -91,6 +94,18 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 
 The Weave backend is deployed as `weave-backend`, routed at `api.<tenant_domain>`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`.
 
+## Release 1 target
+
+The first non-local Release 1 target is a single Linux host with public DNS, public HTTPS, Docker Engine, Terraform, and operator-managed secrets.
+
+That target is documented in `docs/release-1-single-host.md` and is intentionally distinct from the local developer flow:
+
+- local development may use generated secrets, a generated local CA, and an optional test user
+- Release 1 should use explicit secrets, publicly trusted certificates, pinned images, and `TF_VAR_create_test_user=false`
+- local smoke coverage depends on the test user contract, while release verification uses public endpoint checks only
+
+Use `weave-workspace/release.env.example` as the starting point for a real deployment env file.
+
 ## Validation
 
 Current validation flow:
@@ -103,6 +118,14 @@ Current validation flow:
 - `bash weave-workspace/smoke-test.sh`
 
 GitHub Actions now runs both repository-safe validation and a Docker-backed full-stack smoke job on pushes and pull requests through `.github/workflows/ci.yml`.
+
+For non-local Release 1 installs, run:
+
+```bash
+bash weave-workspace/release-verify.sh
+```
+
+with `WEAVE_BASE_URL`, `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_URL`, and `WEAVE_MATRIX_URL` exported from your operator env file.
 
 ## Local Hostnames
 
