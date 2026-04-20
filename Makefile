@@ -1,4 +1,4 @@
-.PHONY: dev-hosts smoke
+.PHONY: dev-hosts smoke release-verify
 
 DEV_HOSTS_LINE := 127.0.0.1 keycloak.weave.local nextcloud.weave.local matrix.weave.local mas.weave.local api.weave.local
 
@@ -8,3 +8,6 @@ dev-hosts:
 
 smoke:
 	@bash weave-workspace/smoke-test.sh
+
+release-verify:
+	@bash weave-workspace/release-verify.sh
