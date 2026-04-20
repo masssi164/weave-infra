@@ -5,7 +5,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
+DEFAULT_CADDY_TLS_CA_FILE="${ROOT_DIR}/01-infrastructure/.generated/caddy/certs/weave-local-ca.pem"
 NEXTCLOUD_CONTAINER_NAME="${NEXTCLOUD_CONTAINER_NAME:-weave-nextcloud}"
+CADDY_TLS_CA_FILE=""
 
 log() {
   printf '%s\n' "$*"
@@ -70,7 +72,7 @@ curl_json() {
 
   host_port="$(host_port_from_url "${url}")"
   curl --silent --show-error --fail \
-    --cacert "${TF_VAR_caddy_tls_ca_file}" \
+    --cacert "${CADDY_TLS_CA_FILE}" \
     --resolve "${host_port}:127.0.0.1" \
     "$url"
 }
@@ -82,7 +84,7 @@ curl_form() {
 
   host_port="$(host_port_from_url "${url}")"
   curl --silent --show-error --fail \
-    --cacert "${TF_VAR_caddy_tls_ca_file}" \
+    --cacert "${CADDY_TLS_CA_FILE}" \
     --resolve "${host_port}:127.0.0.1" \
     -H 'content-type: application/x-www-form-urlencoded' \
     "$url" "$@"
@@ -95,7 +97,7 @@ curl_auth_json() {
 
   host_port="$(host_port_from_url "${url}")"
   curl --silent --show-error --fail \
-    --cacert "${TF_VAR_caddy_tls_ca_file}" \
+    --cacert "${CADDY_TLS_CA_FILE}" \
     --resolve "${host_port}:127.0.0.1" \
     -H "Authorization: Bearer ${token}" \
     "$url"
@@ -107,7 +109,7 @@ curl_status() {
 
   host_port="$(host_port_from_url "${url}")"
   curl --silent --show-error \
-    --cacert "${TF_VAR_caddy_tls_ca_file}" \
+    --cacert "${CADDY_TLS_CA_FILE}" \
     --resolve "${host_port}:127.0.0.1" \
     -o /dev/null \
     -w '%{http_code}' \
@@ -127,7 +129,9 @@ require_command docker
 require_command jq
 load_bootstrap_env
 
-: "${TF_VAR_caddy_tls_ca_file:?Expected TF_VAR_caddy_tls_ca_file in env or bootstrap env}"
+CADDY_TLS_CA_FILE="${TF_VAR_caddy_tls_ca_file:-${DEFAULT_CADDY_TLS_CA_FILE}}"
+[[ -f "${CADDY_TLS_CA_FILE}" ]] || fail "Expected a trusted Caddy TLS CA file at ${CADDY_TLS_CA_FILE}. Set TF_VAR_caddy_tls_ca_file explicitly or run install.sh first."
+
 : "${WEAVE_BASE_URL:?Expected WEAVE_BASE_URL in env or bootstrap env}"
 : "${WEAVE_OIDC_ISSUER_URL:?Expected WEAVE_OIDC_ISSUER_URL in env or bootstrap env}"
 : "${WEAVE_OIDC_CLIENT_ID:?Expected WEAVE_OIDC_CLIENT_ID in env or bootstrap env}"
