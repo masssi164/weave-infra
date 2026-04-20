@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -35,10 +36,10 @@ jobs:
           terraform_version: 1.9.8
           terraform_wrapper: false
 
-      - name: Install shellcheck
+      - name: Install repository tooling
         run: |
           sudo apt-get update
-          sudo apt-get install --yes shellcheck
+          sudo apt-get install --yes jq shellcheck
 
       - name: Check Terraform formatting
         run: terraform fmt -check -recursive weave-workspace
@@ -53,7 +54,66 @@ jobs:
           terraform -chdir=weave-workspace/02-keycloak-setup init -backend=false -input=false
           terraform -chdir=weave-workspace/02-keycloak-setup validate
 
-      - name: Lint bootstrap script
+      - name: Lint bootstrap and smoke scripts
         run: |
           bash -n weave-workspace/install.sh
-          shellcheck weave-workspace/install.sh
+          bash -n weave-workspace/smoke-test.sh
+          shellcheck weave-workspace/install.sh weave-workspace/smoke-test.sh
+
+  smoke:
+    name: Full Stack Smoke
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      - name: Install smoke-test tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes jq
+
+      - name: Check out backend repository for smoke image
+        run: git clone --depth 1 --branch main https://github.com/masssi164/weave-backend.git ../weave-backend
+
+      - name: Build backend image for smoke stack
+        run: docker build --tag weave-backend:smoke ../weave-backend
+
+      - name: Bootstrap the local stack with a smoke-test user
+        env:
+          TF_VAR_create_test_user: "true"
+          TF_VAR_weave_backend_image: weave-backend:smoke
+        run: bash weave-workspace/install.sh
+
+      - name: Run full-stack smoke validation
+        env:
+          TF_VAR_weave_backend_image: weave-backend:smoke
+        run: bash weave-workspace/smoke-test.sh
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          docker ps -a
+          for container in weave-proxy weave-keycloak weave-backend weave-mas weave-synapse weave-nextcloud weave-db; do
+            echo "--- ${container}"
+            docker logs "${container}" || true
+          done
+
+      - name: Destroy stack
+        if: always()
+        run: |
+          source weave-workspace/.generated/bootstrap.env || true
+          terraform -chdir=weave-workspace/02-keycloak-setup destroy -refresh=false -input=false -auto-approve || true
+          terraform -chdir=weave-workspace/01-infrastructure destroy -refresh=false -input=false -auto-approve || true

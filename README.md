@@ -73,8 +73,9 @@ Caddy is managed by the Terraform infrastructure stage. `weave-workspace/docker-
 - `README.md`: top-level usage and architecture summary.
 - `AGENTS.md`: repository navigation notes for future maintainers.
 - `Makefile`: small local operator helpers such as `make dev-hosts`.
-- `.github/workflows/ci.yml`: GitHub Actions workflow for validation checks.
+- `.github/workflows/ci.yml`: GitHub Actions workflow for validation checks plus full-stack smoke coverage.
 - `weave-workspace/install.sh`: end-to-end local bootstrap runbook.
+- `weave-workspace/smoke-test.sh`: release-critical stack contract smoke test.
 - `weave-workspace/.env.example`: hostname, port, and Caddy mount defaults for local operators.
 - `weave-workspace/docker-compose.yml`: Caddy service definition for proxy-only iteration.
 - `weave-workspace/01-infrastructure`: Docker and generated runtime configuration stage.
@@ -99,8 +100,9 @@ Current validation flow:
 - `terraform -chdir=weave-workspace/01-infrastructure plan -refresh=false`
 - `bash -n weave-workspace/install.sh`
 - `bash weave-workspace/install.sh`
+- `bash weave-workspace/smoke-test.sh`
 
-GitHub Actions runs repository-safe validation on pushes and pull requests through `.github/workflows/ci.yml`.
+GitHub Actions now runs both repository-safe validation and a Docker-backed full-stack smoke job on pushes and pull requests through `.github/workflows/ci.yml`.
 
 ## Local Hostnames
 
@@ -133,11 +135,19 @@ export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.en
 
 `WEAVE_BASE_URL` must match the Caddy proxy URL for `api.<tenant_domain>`, and `WEAVE_OIDC_ISSUER_URL` must match the public Keycloak issuer used in access tokens. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
 
-The test user is disabled by default. Enable it only for local integration testing:
+The test user is disabled by default. Enable it only for local integration testing and smoke validation:
 
 ```bash
 cd weave-workspace
 TF_VAR_create_test_user=true ./install.sh
+./smoke-test.sh
+```
+
+Or from the repository root:
+
+```bash
+TF_VAR_create_test_user=true bash weave-workspace/install.sh
+make smoke
 ```
 
 ## Native App Contract
