@@ -119,6 +119,7 @@ load_persisted_env() {
 
   local var
   local index
+  local preset_names_joined=""
   local -a preset_names=()
   local -a preset_values=()
 
@@ -136,9 +137,13 @@ load_persisted_env() {
     export "${preset_names[$index]}=${preset_values[$index]}"
   done
 
+  if (( ${#preset_names[@]} > 0 )); then
+    preset_names_joined=" ${preset_names[*]} "
+  fi
+
   # Preserve compatibility with older bootstrap environments that used
   # TF_VAR_files_subdomain before the contract was renamed.
-  if [[ ! " ${preset_names[*]} " =~ " TF_VAR_nextcloud_subdomain " ]] &&
+  if [[ ! "${preset_names_joined}" =~ " TF_VAR_nextcloud_subdomain " ]] &&
     [[ -n "${TF_VAR_files_subdomain:-}" ]]; then
     export TF_VAR_nextcloud_subdomain="${TF_VAR_files_subdomain}"
     unset TF_VAR_files_subdomain
@@ -146,14 +151,14 @@ load_persisted_env() {
 
   # Migrate the legacy default Nextcloud hostname from files.<tenant_domain>
   # to nextcloud.<tenant_domain> unless the caller already set a value.
-  if [[ ! " ${preset_names[*]} " =~ " TF_VAR_nextcloud_subdomain " ]] &&
+  if [[ ! "${preset_names_joined}" =~ " TF_VAR_nextcloud_subdomain " ]] &&
     [[ "${TF_VAR_nextcloud_subdomain:-}" == "files" ]]; then
     export TF_VAR_nextcloud_subdomain="nextcloud"
   fi
 
   # Migrate the old Keycloak default from auth.<tenant_domain> to
   # keycloak.<tenant_domain> unless the caller already set a value.
-  if [[ ! " ${preset_names[*]} " =~ " TF_VAR_auth_subdomain " ]] &&
+  if [[ ! "${preset_names_joined}" =~ " TF_VAR_auth_subdomain " ]] &&
     [[ "${TF_VAR_auth_subdomain:-}" == "auth" ]]; then
     export TF_VAR_auth_subdomain="keycloak"
   fi
@@ -174,6 +179,8 @@ persist_bootstrap_env() {
   if create_test_user_enabled; then
     {
       printf 'export WEAVE_BASE_URL=%q\n' "$(integration_test_base_url)"
+      printf 'export WEAVE_OIDC_ISSUER_URL=%q\n' "$(integration_test_oidc_issuer_url)"
+      printf 'export WEAVE_OIDC_CLIENT_ID=%q\n' "weave-app"
       printf 'export WEAVE_TEST_USERNAME=%q\n' "${TEST_USER_EMAIL}"
       printf 'export WEAVE_TEST_PASSWORD=%q\n' "${TF_VAR_test_user_password}"
     } >> "${BOOTSTRAP_ENV_FILE}"
@@ -248,6 +255,39 @@ terraform_output_raw() {
   terraform -chdir="${dir}" output -raw "${name}"
 }
 
+refresh_backend_container_if_image_changed() {
+  local desired_image="${TF_VAR_weave_backend_image:-}"
+  local desired_image_id
+  local current_image_id
+
+  if [[ -z "${desired_image}" ]]; then
+    return
+  fi
+
+  if ! docker image inspect "${desired_image}" >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! docker container inspect weave-backend >/dev/null 2>&1; then
+    log "Recreating missing Weave backend container for image ${desired_image}..."
+    terraform -chdir="${INFRA_DIR}" init -input=false
+    terraform -chdir="${INFRA_DIR}" apply -input=false -auto-approve
+    return
+  fi
+
+  desired_image_id="$(docker image inspect --format '{{.Id}}' "${desired_image}")"
+  current_image_id="$(docker inspect --format '{{.Image}}' weave-backend)"
+
+  if [[ "${desired_image_id}" == "${current_image_id}" ]]; then
+    return
+  fi
+
+  log "Refreshing Weave backend container to match image ${desired_image}..."
+  docker rm -f weave-backend >/dev/null
+  terraform -chdir="${INFRA_DIR}" init -input=false
+  terraform -chdir="${INFRA_DIR}" apply -input=false -auto-approve
+}
+
 public_port_suffix() {
   if [[ "${TF_VAR_public_scheme}" == "http" && "${TF_VAR_proxy_host_port}" == "80" ]] ||
     [[ "${TF_VAR_public_scheme}" == "https" && "${TF_VAR_proxy_host_port}" == "443" ]]; then
@@ -275,6 +315,10 @@ create_test_user_enabled() {
 
 integration_test_base_url() {
   printf '%s://%s%s' "${TF_VAR_public_scheme}" "$(public_host "${TF_VAR_api_subdomain}")" "$(public_port_suffix)"
+}
+
+integration_test_oidc_issuer_url() {
+  printf '%s://%s%s/realms/%s' "${TF_VAR_public_scheme}" "$(public_host "${TF_VAR_auth_subdomain}")" "$(public_port_suffix)" "${TF_VAR_tenant_slug}"
 }
 
 ensure_generated_directories() {
@@ -527,12 +571,14 @@ configure_nextcloud_oidc() {
 print_summary() {
   local suffix
   local backend_url
+  local issuer_url
   local nextcloud_url
   local weave_client_id
 
   suffix="$(public_port_suffix)"
   nextcloud_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_nextcloud_subdomain}")${suffix}"
   backend_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_api_subdomain}")${suffix}"
+  issuer_url="$(integration_test_oidc_issuer_url)"
   weave_client_id="$(terraform_output_raw "${KEYCLOAK_DIR}" weave_app_client_id)"
 
   log
@@ -553,7 +599,7 @@ print_summary() {
 
   if create_test_user_enabled; then
     log "Test user: ${TEST_USER_EMAIL} / ${TF_VAR_test_user_password}"
-    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=${TF_VAR_test_user_password}"
+    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_OIDC_ISSUER_URL=${issuer_url} WEAVE_OIDC_CLIENT_ID=${weave_client_id} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=${TF_VAR_test_user_password}"
   fi
 }
 
@@ -573,6 +619,7 @@ main() {
 
   log "Applying infrastructure module..."
   terraform_apply "${INFRA_DIR}"
+  refresh_backend_container_if_image_changed
 
   log "Waiting for Keycloak readiness..."
   wait_for_http_200 "Keycloak" "http://${LOOPBACK_HOST}:${TF_VAR_keycloak_host_port}/health/ready"

@@ -34,12 +34,12 @@ output "weave_backend_client_id" {
 }
 
 output "weave_backend_audience" {
-  description = "Audience value emitted for Weave backend access tokens."
-  value       = keycloak_openid_client.client["weave_backend"].client_id
+  description = "Audience value emitted for access tokens that the Weave backend accepts."
+  value       = keycloak_openid_client.client["weave_app"].client_id
 }
 
 output "weave_workspace_scope_name" {
-  description = "Client scope that adds the Weave backend audience."
+  description = "Client scope that adds the Weave backend-required audience."
   value       = keycloak_openid_client_scope.weave_workspace.name
 }
 

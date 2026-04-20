@@ -52,7 +52,7 @@ locals {
   caddy_tls_key_file  = abspath(coalesce(var.caddy_tls_key_file, "${path.module}/.generated/caddy/certs/weave.local-key.pem"))
   caddy_tls_ca_file   = abspath(coalesce(var.caddy_tls_ca_file, "${path.module}/.generated/caddy/certs/weave-local-ca.pem"))
   caddy_certs_dir     = dirname(local.caddy_tls_cert_file)
-  caddyfile_path      = "${path.module}/.generated/caddy/Caddyfile"
+  caddyfile_path      = abspath("${path.module}/.generated/caddy/Caddyfile")
   caddyfile_content = templatefile("${path.module}/templates/Caddyfile.tpl", {
     keycloak_public_host  = local.public_hosts.keycloak
     nextcloud_public_host = local.public_hosts.nextcloud
@@ -68,11 +68,11 @@ locals {
     tls_key_filename  = basename(local.caddy_tls_key_file)
   })
 
-  # Backend / Keycloak contract (from #4)
-  # public URL for documentation; internal URL for backend container (Docker network routing)
-  keycloak_issuer_url          = "${local.public_urls.keycloak}/realms/${var.tenant_slug}"
-  keycloak_internal_issuer_url = "http://${local.service_names.keycloak}:8080/realms/${var.tenant_slug}"
-  weave_backend_audience       = "weave-backend"
+  # Backend / Keycloak contract: validate public iss values while fetching JWKS over the Docker network.
+  keycloak_issuer_url    = "${local.public_urls.keycloak}/realms/${var.tenant_slug}"
+  keycloak_jwk_set_uri   = "http://${local.service_names.keycloak}:8080/realms/${var.tenant_slug}/protocol/openid-connect/certs"
+  weave_app_client_id    = "weave-app"
+  weave_backend_audience = local.weave_app_client_id
 
   service_databases = {
     keycloak = {
@@ -287,16 +287,16 @@ module "keycloak" {
 module "backend" {
   source = "./modules/backend"
 
-  network_name   = docker_network.weave_network.name
-  container_name = local.service_names.backend
-  image_name     = var.weave_backend_image
-  host_port      = var.backend_host_port
-  container_port = var.backend_container_port
-  public_host    = local.public_hosts.api
-  # Use internal issuer URL: backend reaches Keycloak via Docker network alias (port 8080)
-  # not the host-mapped port. Public URL is documented in KEYCLOAK_CONTRACT.md.
-  oidc_issuer_uri        = local.keycloak_internal_issuer_url
+  network_name           = docker_network.weave_network.name
+  container_name         = local.service_names.backend
+  image_name             = var.weave_backend_image
+  host_port              = var.backend_host_port
+  container_port         = var.backend_container_port
+  public_host            = local.public_hosts.api
+  oidc_issuer_uri        = local.keycloak_issuer_url
+  oidc_jwk_set_uri       = local.keycloak_jwk_set_uri
   oidc_required_audience = local.weave_backend_audience
+  client_id              = local.weave_app_client_id
   healthcheck_path       = "/actuator/health"
   depends_on             = [module.keycloak]
 }
