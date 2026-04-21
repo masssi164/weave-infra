@@ -101,6 +101,7 @@ locals {
       username             = var.nextcloud_db_username
       escaped_password     = replace(var.nextcloud_db_password, "'", "''")
       create_statement_sql = "''"
+      database_exists_sql  = "SELECT 1 FROM pg_database WHERE datname = '${var.db_name}'"
       bootstrap_sql        = <<-EOSCHEMA
         DO $$
         BEGIN
@@ -132,9 +133,7 @@ locals {
 
         ${service.create_statement_sql != "''" ? format("SELECT %s\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM pg_database\n  WHERE datname = '%s'\n) \\gexec\n", service.create_statement_sql, service.database_name) : ""}
 
-        ALTER DATABASE ${service.database_name} OWNER TO ${service.username};
-        REVOKE ALL ON DATABASE ${service.database_name} FROM PUBLIC;
-        GRANT CONNECT, TEMPORARY ON DATABASE ${service.database_name} TO ${service.username};
+        ${try(service.database_exists_sql, "SELECT 1 FROM pg_database WHERE datname = '${service.database_name}'") != "" ? format("SELECT format('ALTER DATABASE %%I OWNER TO %%I', '%s', '%s')\nWHERE EXISTS (\n  %s\n) \\gexec\n\nSELECT format('REVOKE ALL ON DATABASE %%I FROM PUBLIC', '%s')\nWHERE EXISTS (\n  %s\n) \\gexec\n\nSELECT format('GRANT CONNECT, TEMPORARY ON DATABASE %%I TO %%I', '%s', '%s')\nWHERE EXISTS (\n  %s\n) \\gexec", service.database_name, service.username, try(service.database_exists_sql, "SELECT 1 FROM pg_database WHERE datname = '${service.database_name}'"), service.database_name, try(service.database_exists_sql, "SELECT 1 FROM pg_database WHERE datname = '${service.database_name}'"), service.database_name, service.username, try(service.database_exists_sql, "SELECT 1 FROM pg_database WHERE datname = '${service.database_name}'")) : ""}
         ${service.bootstrap_sql}
       EOS
 ])}
