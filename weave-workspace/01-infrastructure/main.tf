@@ -54,14 +54,14 @@ locals {
   caddy_certs_dir     = dirname(local.caddy_tls_cert_file)
   caddyfile_path      = abspath("${path.module}/.generated/caddy/Caddyfile")
   caddyfile_content = templatefile("${path.module}/templates/Caddyfile.tpl", {
-    keycloak_public_host  = local.public_hosts.keycloak
-    nextcloud_public_host = local.public_hosts.nextcloud
-    matrix_public_host    = local.public_hosts.matrix
-    api_public_host       = local.public_hosts.api
-    keycloak_upstream     = "${local.service_names.keycloak}:8080"
-    nextcloud_upstream    = "${local.service_names.nextcloud}:80"
-    mas_upstream          = "${local.service_names.mas}:8080"
-    synapse_upstream      = "${local.service_names.synapse}:8008"
+    keycloak_site_addresses  = local.public_port_suffix == "" ? "https://${local.public_hosts.keycloak}" : "https://${local.public_hosts.keycloak}, https://${local.public_hosts.keycloak}${local.public_port_suffix}"
+    nextcloud_site_addresses = local.public_port_suffix == "" ? "https://${local.public_hosts.nextcloud}" : "https://${local.public_hosts.nextcloud}, https://${local.public_hosts.nextcloud}${local.public_port_suffix}"
+    matrix_site_addresses    = local.public_port_suffix == "" ? "https://${local.public_hosts.matrix}" : "https://${local.public_hosts.matrix}, https://${local.public_hosts.matrix}${local.public_port_suffix}"
+    api_site_addresses       = local.public_port_suffix == "" ? "https://${local.public_hosts.api}" : "https://${local.public_hosts.api}, https://${local.public_hosts.api}${local.public_port_suffix}"
+    keycloak_upstream        = "${local.service_names.keycloak}:8080"
+    nextcloud_upstream       = "${local.service_names.nextcloud}:80"
+    mas_upstream             = "${local.service_names.mas}:8080"
+    synapse_upstream         = "${local.service_names.synapse}:8008"
     # Backend is routed via Caddy (api_upstream); no Traefik labels needed
     api_upstream      = "${local.service_names.backend}:${var.backend_container_port}"
     tls_cert_filename = basename(local.caddy_tls_cert_file)
@@ -80,24 +80,50 @@ locals {
       username             = var.keycloak_db_username
       escaped_password     = replace(var.keycloak_db_password, "'", "''")
       create_statement_sql = "format('CREATE DATABASE %I OWNER %I', '${var.db_name}_keycloak', '${var.keycloak_db_username}')"
+      bootstrap_sql        = ""
     }
     mas = {
       database_name        = "${var.db_name}_mas"
       username             = var.mas_db_username
       escaped_password     = replace(var.mas_db_password, "'", "''")
       create_statement_sql = "format('CREATE DATABASE %I OWNER %I', '${var.db_name}_mas', '${var.mas_db_username}')"
+      bootstrap_sql        = ""
     }
     synapse = {
       database_name        = "${var.db_name}_synapse"
       username             = var.synapse_db_username
       escaped_password     = replace(var.synapse_db_password, "'", "''")
       create_statement_sql = "format('CREATE DATABASE %I OWNER %I TEMPLATE template0 LC_COLLATE ''C'' LC_CTYPE ''C''', '${var.db_name}_synapse', '${var.synapse_db_username}')"
+      bootstrap_sql        = ""
     }
     nextcloud = {
-      database_name        = "${var.db_name}_nextcloud"
+      database_name        = var.db_name
       username             = var.nextcloud_db_username
       escaped_password     = replace(var.nextcloud_db_password, "'", "''")
-      create_statement_sql = "format('CREATE DATABASE %I OWNER %I', '${var.db_name}_nextcloud', '${var.nextcloud_db_username}')"
+      create_statement_sql = "format('CREATE DATABASE %I OWNER %I', '${var.db_name}', '${var.nextcloud_db_username}')"
+      database_exists_sql  = "SELECT 1 FROM pg_database WHERE datname = '${var.db_name}'"
+      bootstrap_sql        = <<-EOSCHEMA
+        SELECT EXISTS (
+          SELECT 1
+          FROM pg_database
+          WHERE datname = '${var.db_name}'
+        ) AS nextcloud_database_exists \gset
+        \if :nextcloud_database_exists
+        \connect ${var.db_name}
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'nextcloud') THEN
+            EXECUTE format('CREATE SCHEMA %I AUTHORIZATION %I', 'nextcloud', '${var.nextcloud_db_username}');
+          END IF;
+        END
+        $$;
+
+        ALTER SCHEMA nextcloud OWNER TO ${var.nextcloud_db_username};
+        GRANT USAGE, CREATE ON SCHEMA nextcloud TO ${var.nextcloud_db_username};
+        ALTER ROLE ${var.nextcloud_db_username} IN DATABASE ${var.db_name} SET search_path TO nextcloud, public;
+        \connect postgres
+        \endif
+      EOSCHEMA
     }
   }
 
@@ -114,16 +140,10 @@ locals {
         END
         $$;
 
-        SELECT ${service.create_statement_sql}
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM pg_database
-          WHERE datname = '${service.database_name}'
-        ) \gexec
+        ${service.create_statement_sql != "''" ? format("SELECT %s\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM pg_database\n  WHERE datname = '%s'\n) \\gexec\n", service.create_statement_sql, service.database_name) : ""}
 
-        ALTER DATABASE ${service.database_name} OWNER TO ${service.username};
-        REVOKE ALL ON DATABASE ${service.database_name} FROM PUBLIC;
-        GRANT CONNECT, TEMPORARY ON DATABASE ${service.database_name} TO ${service.username};
+        ${try(service.database_exists_sql, "SELECT 1 FROM pg_database WHERE datname = '${service.database_name}'") != "" ? format("SELECT format('ALTER DATABASE %%I OWNER TO %%I', '%s', '%s')\nWHERE EXISTS (\n  %s\n) \\gexec\n\nSELECT format('REVOKE ALL ON DATABASE %%I FROM PUBLIC', '%s')\nWHERE EXISTS (\n  %s\n) \\gexec\n\nSELECT format('GRANT CONNECT, TEMPORARY ON DATABASE %%I TO %%I', '%s', '%s')\nWHERE EXISTS (\n  %s\n) \\gexec", service.database_name, service.username, try(service.database_exists_sql, "SELECT 1 FROM pg_database WHERE datname = '${service.database_name}'"), service.database_name, try(service.database_exists_sql, "SELECT 1 FROM pg_database WHERE datname = '${service.database_name}'"), service.database_name, service.username, try(service.database_exists_sql, "SELECT 1 FROM pg_database WHERE datname = '${service.database_name}'")) : ""}
+        ${service.bootstrap_sql}
       EOS
 ])}
   SQL

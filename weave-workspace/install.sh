@@ -112,6 +112,24 @@ random_hex() {
   openssl rand -hex "${bytes}"
 }
 
+normalize_repo_local_cert_path_var() {
+  local name="$1"
+  local value="${!name:-}"
+  local repo_generated_suffix="/weave-workspace/01-infrastructure/.generated/caddy/certs/"
+
+  if [[ -z "${value}" || "${value}" != *"${repo_generated_suffix}"* ]]; then
+    return
+  fi
+
+  export "${name}=${INFRA_DIR}/.generated/caddy/certs/$(basename -- "${value}")"
+}
+
+normalize_repo_local_paths() {
+  normalize_repo_local_cert_path_var TF_VAR_caddy_tls_cert_file
+  normalize_repo_local_cert_path_var TF_VAR_caddy_tls_key_file
+  normalize_repo_local_cert_path_var TF_VAR_caddy_tls_ca_file
+}
+
 load_persisted_env() {
   if [[ ! -f "${BOOTSTRAP_ENV_FILE}" ]]; then
     return
@@ -132,6 +150,7 @@ load_persisted_env() {
 
   # shellcheck disable=SC1090
   source "${BOOTSTRAP_ENV_FILE}"
+  normalize_repo_local_paths
 
   for ((index = 0; index < ${#preset_names[@]}; index++)); do
     export "${preset_names[$index]}=${preset_values[$index]}"
@@ -560,6 +579,9 @@ configure_nextcloud_oidc() {
     allow_insecure_http=1
   fi
 
+  # The OIDC provider is reached via the local reverse proxy hostname on the Docker network.
+  # Nextcloud blocks RFC1918 / local-address targets by default, which breaks discovery in local dev.
+  occ config:system:set allow_local_remote_servers --type=bool --value=true
   occ config:app:set --type=boolean --value="${allow_insecure_http}" user_oidc allow_insecure_http
   occ user_oidc:provider keycloak \
     --clientid="${nextcloud_client_id}" \

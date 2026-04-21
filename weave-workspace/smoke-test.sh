@@ -4,6 +4,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+INFRA_DIR="${ROOT_DIR}/01-infrastructure"
 BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
 DEFAULT_CADDY_TLS_CA_FILE="${ROOT_DIR}/01-infrastructure/.generated/caddy/certs/weave-local-ca.pem"
 NEXTCLOUD_CONTAINER_NAME="${NEXTCLOUD_CONTAINER_NAME:-weave-nextcloud}"
@@ -22,10 +23,29 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
+normalize_repo_local_cert_path_var() {
+  local name="$1"
+  local value="${!name:-}"
+  local repo_generated_suffix="/weave-workspace/01-infrastructure/.generated/caddy/certs/"
+
+  if [[ -z "${value}" || "${value}" != *"${repo_generated_suffix}"* ]]; then
+    return
+  fi
+
+  export "${name}=${INFRA_DIR}/.generated/caddy/certs/$(basename -- "${value}")"
+}
+
+normalize_repo_local_paths() {
+  normalize_repo_local_cert_path_var TF_VAR_caddy_tls_cert_file
+  normalize_repo_local_cert_path_var TF_VAR_caddy_tls_key_file
+  normalize_repo_local_cert_path_var TF_VAR_caddy_tls_ca_file
+}
+
 load_bootstrap_env() {
   if [[ -f "${BOOTSTRAP_ENV_FILE}" ]]; then
     # shellcheck disable=SC1090
     source "${BOOTSTRAP_ENV_FILE}"
+    normalize_repo_local_paths
   fi
 }
 
@@ -116,6 +136,19 @@ curl_status() {
     "$url"
 }
 
+curl_location() {
+  local url="$1"
+  local host_port
+
+  host_port="$(host_port_from_url "${url}")"
+  curl --silent --show-error \
+    --cacert "${CADDY_TLS_CA_FILE}" \
+    --resolve "${host_port}:127.0.0.1" \
+    -o /dev/null \
+    -D - \
+    "$url" | grep -im1 '^location:' | cut -d' ' -f2- | tr -d '\r'
+}
+
 assert_json() {
   local json="$1"
   local jq_filter="$2"
@@ -175,6 +208,8 @@ assert_json "${nextcloud_providers}" ".identifier == \"keycloak\"" "Nextcloud sh
 assert_json "${nextcloud_providers}" ".clientId == \"nextcloud\"" "Nextcloud provider client ID should stay aligned"
 assert_json "${nextcloud_providers}" ".discoveryEndpoint == \"${WEAVE_OIDC_ISSUER_URL}/.well-known/openid-configuration\"" "Nextcloud should point at the public Keycloak discovery URL"
 assert_json "${nextcloud_providers}" '.settings.groupProvisioning == true' "Nextcloud group provisioning should remain enabled"
+nextcloud_oidc_redirect="$(curl_location "$(public_url "${TF_VAR_nextcloud_subdomain:-nextcloud}")/apps/user_oidc/login/1")"
+[[ "${nextcloud_oidc_redirect}" == https://keycloak* ]] || fail "Smoke check failed: Nextcloud OIDC login should redirect to Keycloak, got '${nextcloud_oidc_redirect}'"
 
 log "Checking Matrix auth routing and MAS wiring..."
 matrix_base_url="$(public_url "${TF_VAR_matrix_subdomain:-matrix}")"

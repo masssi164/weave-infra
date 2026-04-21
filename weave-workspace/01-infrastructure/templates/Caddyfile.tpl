@@ -2,21 +2,21 @@
 	admin off
 }
 
-https://${keycloak_public_host} {
+${keycloak_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
 	reverse_proxy ${keycloak_upstream}
 }
 
-https://${nextcloud_public_host} {
+${nextcloud_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
 	reverse_proxy ${nextcloud_upstream}
 }
 
-https://${matrix_public_host} {
+${matrix_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
@@ -36,7 +36,7 @@ https://${matrix_public_host} {
 	}
 }
 
-https://${api_public_host} {
+${api_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
