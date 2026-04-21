@@ -103,6 +103,13 @@ locals {
       create_statement_sql = "''"
       database_exists_sql  = "SELECT 1 FROM pg_database WHERE datname = '${var.db_name}'"
       bootstrap_sql        = <<-EOSCHEMA
+        SELECT EXISTS (
+          SELECT 1
+          FROM pg_database
+          WHERE datname = '${var.db_name}'
+        ) AS nextcloud_database_exists \gset
+        \if :nextcloud_database_exists
+        \connect ${var.db_name}
         DO $$
         BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'nextcloud') THEN
@@ -114,6 +121,8 @@ locals {
         ALTER SCHEMA nextcloud OWNER TO ${var.nextcloud_db_username};
         GRANT USAGE, CREATE ON SCHEMA nextcloud TO ${var.nextcloud_db_username};
         ALTER ROLE ${var.nextcloud_db_username} IN DATABASE ${var.db_name} SET search_path TO nextcloud, public;
+        \connect postgres
+        \endif
       EOSCHEMA
     }
   }
