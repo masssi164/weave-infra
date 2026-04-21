@@ -5,6 +5,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      weave_backend_image:
+        description: "Backend image to validate in the smoke stack"
+        required: false
+        default: "ghcr.io/masssi164/weave-backend:latest"
 
 permissions:
   contents: read
@@ -12,12 +18,14 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  WEAVE_BACKEND_IMAGE: ${{ github.event.inputs.weave_backend_image || 'ghcr.io/masssi164/weave-backend:latest' }}
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+
   validate:
     name: Validate Stack
     runs-on: ubuntu-latest
@@ -85,21 +93,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes jq
 
-      - name: Check out backend repository for smoke image
-        run: git clone --depth 1 --branch main https://github.com/masssi164/weave-backend.git ../weave-backend
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build backend image for smoke stack
-        run: docker build --tag weave-backend:smoke ../weave-backend
+      - name: Pull backend image for smoke stack
+        run: docker pull "${WEAVE_BACKEND_IMAGE}"
 
       - name: Bootstrap the local stack with a smoke-test user
         env:
           TF_VAR_create_test_user: "true"
-          TF_VAR_weave_backend_image: weave-backend:smoke
+          TF_VAR_weave_backend_image: ${{ env.WEAVE_BACKEND_IMAGE }}
         run: bash weave-workspace/install.sh
 
       - name: Run full-stack smoke validation
         env:
-          TF_VAR_weave_backend_image: weave-backend:smoke
+          TF_VAR_weave_backend_image: ${{ env.WEAVE_BACKEND_IMAGE }}
         run: bash weave-workspace/smoke-test.sh
 
       - name: Dump container logs on failure
