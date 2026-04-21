@@ -1,6 +1,6 @@
-.PHONY: dev-hosts smoke release-verify
+.PHONY: dev-hosts smoke release-verify operator-check
 
-DEV_HOSTS_LINE := 127.0.0.1 keycloak.weave.local nextcloud.weave.local matrix.weave.local mas.weave.local api.weave.local
+DEV_HOSTS_LINE := 127.0.0.1 keycloak.weave.local nextcloud.weave.local matrix.weave.local api.weave.local
 
 dev-hosts:
 	@printf '%s\n' 'Add this line to /etc/hosts for the default local stack:'
@@ -11,3 +11,6 @@ smoke:
 
 release-verify:
 	@bash weave-workspace/release-verify.sh
+
+operator-check:
+	@bash weave-workspace/operator-check.sh

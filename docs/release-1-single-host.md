@@ -127,7 +127,10 @@ At minimum, operators need:
 - backup and restore procedure for Postgres and Nextcloud data
 - image upgrade procedure with a rollback point
 - a post-deploy verification step using `release-verify.sh`
+- a host-local verification step using `operator-check.sh`
 - a note explaining whether test users are forbidden or temporarily enabled in the environment
+
+Use `docs/operator-runbook.md` as the concrete Release 1 runbook for install, verification, rotation, backup, restore, and first-line triage.
 
 ## Not the Release 1 story yet
 

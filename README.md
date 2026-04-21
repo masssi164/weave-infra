@@ -99,7 +99,9 @@ Caddy is managed by the Terraform infrastructure stage. `weave-workspace/docker-
 - `weave-workspace/teardown.sh`: shared-host cleanup helper for Terraform state drift and stale Docker resources.
 - `weave-workspace/smoke-test.sh`: local full-stack smoke test that requires the optional test user flow.
 - `weave-workspace/release-verify.sh`: public endpoint verification script for non-local Release 1 installs.
+- `weave-workspace/operator-check.sh`: host-local operational check for core containers plus loopback/public health.
 - `weave-workspace/release.env.example`: operator-facing env template for single-host Release 1 deployments.
+- `docs/operator-runbook.md`: install, verify, rotate, backup, restore, and triage guidance for Release 1 operators.
 - `weave-workspace/.env.example`: hostname, port, and Caddy mount defaults for local operators.
 - `weave-workspace/docker-compose.yml`: Caddy service definition for proxy-only iteration.
 - `weave-workspace/01-infrastructure`: Docker and generated runtime configuration stage.
@@ -146,9 +148,12 @@ For non-local Release 1 installs, run:
 
 ```bash
 bash weave-workspace/release-verify.sh
+bash weave-workspace/operator-check.sh
 ```
 
 with `WEAVE_BASE_URL`, `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_URL`, and `WEAVE_MATRIX_URL` exported from your operator env file.
+
+`release-verify.sh` confirms the public Release 1 contract. `operator-check.sh` adds host-local checks for the managed containers plus loopback service health so operators can distinguish public routing failures from service failures.
 
 ## Local Hostnames
 
@@ -166,6 +171,10 @@ Default `/etc/hosts` line:
 ```
 
 MAS is served behind the matrix hostname; no separate `mas.<tenant_domain>` entry is needed.
+
+## Operator runbook
+
+For the Release 1 operator layer, including secrets rotation expectations, backup scope, restore order, and routine triage commands, use `docs/operator-runbook.md`.
 
 ## Integration Tests
 
