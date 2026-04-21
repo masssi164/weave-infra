@@ -126,6 +126,9 @@ resource "docker_container" "synapse" {
     "SYNAPSE_CONFIG_PATH=/config/homeserver.yaml",
     "SYNAPSE_SERVER_NAME=${var.matrix_public_host}",
     "SYNAPSE_REPORT_STATS=no",
+    "SSL_CERT_FILE=/certs/${var.tls_ca_filename}",
+    "CURL_CA_BUNDLE=/certs/${var.tls_ca_filename}",
+    "REQUESTS_CA_BUNDLE=/certs/${var.tls_ca_filename}",
   ]
 
   ports {
@@ -142,6 +145,12 @@ resource "docker_container" "synapse" {
   volumes {
     volume_name    = docker_volume.synapse_data.name
     container_path = "/data"
+  }
+
+  volumes {
+    host_path      = var.certs_dir
+    container_path = "/certs"
+    read_only      = true
   }
 
   networks_advanced {

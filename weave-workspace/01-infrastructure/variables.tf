@@ -184,7 +184,7 @@ variable "keycloak_image" {
 variable "mas_image" {
   description = "Matrix Authentication Service image."
   type        = string
-  default     = "ghcr.io/matrix-org/matrix-authentication-service:latest"
+  default     = "ghcr.io/element-hq/matrix-authentication-service:latest"
 }
 
 variable "synapse_image" {

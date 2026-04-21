@@ -4,6 +4,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+INFRA_DIR="${ROOT_DIR}/01-infrastructure"
 BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
 DEFAULT_CADDY_TLS_CA_FILE="${ROOT_DIR}/01-infrastructure/.generated/caddy/certs/weave-local-ca.pem"
 NEXTCLOUD_CONTAINER_NAME="${NEXTCLOUD_CONTAINER_NAME:-weave-nextcloud}"
@@ -22,10 +23,29 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
+normalize_repo_local_cert_path_var() {
+  local name="$1"
+  local value="${!name:-}"
+  local repo_generated_suffix="/weave-workspace/01-infrastructure/.generated/caddy/certs/"
+
+  if [[ -z "${value}" || "${value}" != *"${repo_generated_suffix}"* ]]; then
+    return
+  fi
+
+  export "${name}=${INFRA_DIR}/.generated/caddy/certs/$(basename -- "${value}")"
+}
+
+normalize_repo_local_paths() {
+  normalize_repo_local_cert_path_var TF_VAR_caddy_tls_cert_file
+  normalize_repo_local_cert_path_var TF_VAR_caddy_tls_key_file
+  normalize_repo_local_cert_path_var TF_VAR_caddy_tls_ca_file
+}
+
 load_bootstrap_env() {
   if [[ -f "${BOOTSTRAP_ENV_FILE}" ]]; then
     # shellcheck disable=SC1090
     source "${BOOTSTRAP_ENV_FILE}"
+    normalize_repo_local_paths
   fi
 }
 

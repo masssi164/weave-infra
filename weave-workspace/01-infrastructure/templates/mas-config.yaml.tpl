@@ -40,6 +40,11 @@ account:
   password_registration_enabled: false
   login_with_email_allowed: true
 
+policy:
+  data:
+    client_registration:
+      allow_insecure_uris: true
+
 upstream_oauth2:
   providers:
     - id: ${upstream_provider_id}
