@@ -28,11 +28,31 @@ cd weave-workspace
 
 Run `make dev-hosts` from the repository root to print the default `/etc/hosts` line.
 
-`install.sh` supplies sensible local defaults, generates secrets and local TLS certificates when they are not already exported as `TF_VAR_*`, applies both Terraform stages in order, waits for readiness, and bootstraps the Nextcloud `user_oidc` app.
+`install.sh` now defaults to a shared-host-safe isolated port block, generates secrets and local TLS certificates when they are not already exported as `TF_VAR_*`, applies both Terraform stages in order, waits for readiness, and bootstraps the Nextcloud `user_oidc` app.
 
 For repeatable local runs, generated bootstrap inputs are persisted in `weave-workspace/.generated/bootstrap.env` and reused on subsequent installs unless you override them explicitly with environment variables.
 
 The installer probes local services through `127.0.0.1` rather than bare `localhost` so Docker port checks stay reliable on hosts where IPv6 loopback behaves differently.
+
+## Port Modes
+
+There are now two supported port modes:
+
+- canonical single-stack ports: `80`, `443`, `8080`, `8082`, `8008`, `8083`, `8084`
+- required shared-host isolation block: `44080`, `44443`, `48080`, `48082`, `48008`, `48083`, `48084`
+
+Use the canonical ports only when Weave owns the machine's standard local ports. On any shared Docker host or self-hosted runner, use the isolated block. `install.sh` defaults to the isolated block, and `.env.example` shows both modes explicitly.
+
+If you need a completely clean rerun on a shared host, use the runner-hygiene helper before or after bootstrap:
+
+```bash
+cd weave-workspace
+WEAVE_RUNNER_HYGIENE=true ./install.sh
+# or
+bash ./teardown.sh
+```
+
+Set `WEAVE_REMOVE_VOLUMES=true` when you also want to remove persisted Docker volumes such as `weave_synapse_data`.
 
 ## TLS Setup
 
@@ -76,6 +96,7 @@ Caddy is managed by the Terraform infrastructure stage. `weave-workspace/docker-
 - `.github/workflows/ci.yml`: GitHub Actions workflow for validation checks plus full-stack smoke coverage.
 - `docs/release-1-single-host.md`: Release 1 single-host deployment target, required inputs, and operator expectations.
 - `weave-workspace/install.sh`: end-to-end bootstrap runbook for both local and single-host deployments.
+- `weave-workspace/teardown.sh`: shared-host cleanup helper for Terraform state drift and stale Docker resources.
 - `weave-workspace/smoke-test.sh`: local full-stack smoke test that requires the optional test user flow.
 - `weave-workspace/release-verify.sh`: public endpoint verification script for non-local Release 1 installs.
 - `weave-workspace/release.env.example`: operator-facing env template for single-host Release 1 deployments.
@@ -93,6 +114,8 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>` (Nextcloud stores its tables in schema `nextcloud` here)
 
 The Weave backend is deployed as `weave-backend`, routed at `api.<tenant_domain>`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`.
+
+If that backend image is private in GHCR, authenticate the Docker client before running `install.sh` or `smoke-test.sh`. The consumer side should use an explicit `docker login ghcr.io` step or a CI login action rather than relying on an ambient cached session.
 
 ## Release 1 target
 

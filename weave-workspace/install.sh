@@ -9,6 +9,7 @@ readonly ROOT_DIR
 readonly INFRA_DIR="${ROOT_DIR}/01-infrastructure"
 readonly KEYCLOAK_DIR="${ROOT_DIR}/02-keycloak-setup"
 readonly BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
+readonly TEARDOWN_SCRIPT="${ROOT_DIR}/teardown.sh"
 readonly LOOPBACK_HOST="127.0.0.1"
 readonly TEST_USER_EMAIL="test@weave.local"
 readonly PERSISTED_TF_VARS=(
@@ -349,6 +350,19 @@ ensure_generated_directories() {
     "${INFRA_DIR}/.generated/synapse"
 }
 
+maybe_prepare_runner_hygiene() {
+  if [[ "${WEAVE_RUNNER_HYGIENE:-false}" != "true" ]]; then
+    return
+  fi
+
+  if [[ ! -x "${TEARDOWN_SCRIPT}" && ! -f "${TEARDOWN_SCRIPT}" ]]; then
+    fail "Expected teardown helper at ${TEARDOWN_SCRIPT}"
+  fi
+
+  log "Running shared-host hygiene cleanup before bootstrap..."
+  WEAVE_REMOVE_VOLUMES="${WEAVE_REMOVE_VOLUMES:-false}" bash "${TEARDOWN_SCRIPT}"
+}
+
 ensure_default_inputs() {
   local defaults=(
     "TF_VAR_docker_network_name=weave_network"
@@ -359,14 +373,14 @@ ensure_default_inputs() {
     "TF_VAR_nextcloud_subdomain=nextcloud"
     "TF_VAR_api_subdomain=api"
     "TF_VAR_public_scheme=https"
-    "TF_VAR_proxy_host_port=443"
-    "TF_VAR_proxy_http_host_port=80"
-    "TF_VAR_keycloak_host_port=8080"
-    "TF_VAR_mas_host_port=8082"
-    "TF_VAR_synapse_host_port=8008"
-    "TF_VAR_nextcloud_host_port=8083"
+    "TF_VAR_proxy_host_port=44443"
+    "TF_VAR_proxy_http_host_port=44080"
+    "TF_VAR_keycloak_host_port=48080"
+    "TF_VAR_mas_host_port=48082"
+    "TF_VAR_synapse_host_port=48008"
+    "TF_VAR_nextcloud_host_port=48083"
     "TF_VAR_nextcloud_trusted_proxies=172.16.0.0/12"
-    "TF_VAR_backend_host_port=8084"
+    "TF_VAR_backend_host_port=48084"
     "TF_VAR_backend_container_port=8080"
     "TF_VAR_weave_backend_image=ghcr.io/masssi164/weave-backend:latest"
     "TF_VAR_synapse_uid=991"
@@ -634,6 +648,7 @@ main() {
   ensure_generated_directories
   load_persisted_env
   ensure_default_inputs
+  maybe_prepare_runner_hygiene
   ensure_docker_provider_inputs
   ensure_generated_secrets
   ensure_local_tls_certificates
