@@ -9,6 +9,7 @@ readonly ROOT_DIR
 readonly INFRA_DIR="${ROOT_DIR}/01-infrastructure"
 readonly KEYCLOAK_DIR="${ROOT_DIR}/02-keycloak-setup"
 readonly BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
+readonly RUNNER_BOOTSTRAP_ENV_FILE="/tmp/weave-infra/weave-workspace/.generated/bootstrap.env"
 readonly LOOPBACK_HOST="127.0.0.1"
 readonly TEST_USER_EMAIL="test@weave.local"
 readonly PERSISTED_TF_VARS=(
@@ -186,6 +187,7 @@ load_persisted_env() {
 persist_bootstrap_env() {
   local var
 
+  mkdir -p "$(dirname -- "${BOOTSTRAP_ENV_FILE}")" "$(dirname -- "${RUNNER_BOOTSTRAP_ENV_FILE}")"
   : > "${BOOTSTRAP_ENV_FILE}"
   chmod 600 "${BOOTSTRAP_ENV_FILE}"
 
@@ -204,6 +206,9 @@ persist_bootstrap_env() {
       printf 'export WEAVE_TEST_PASSWORD=%q\n' "${TF_VAR_test_user_password}"
     } >> "${BOOTSTRAP_ENV_FILE}"
   fi
+
+  cp "${BOOTSTRAP_ENV_FILE}" "${RUNNER_BOOTSTRAP_ENV_FILE}"
+  chmod 600 "${RUNNER_BOOTSTRAP_ENV_FILE}"
 }
 
 ensure_mas_signing_key() {
