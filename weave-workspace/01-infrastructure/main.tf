@@ -100,7 +100,7 @@ locals {
       database_name        = var.db_name
       username             = var.nextcloud_db_username
       escaped_password     = replace(var.nextcloud_db_password, "'", "''")
-      create_statement_sql = "''"
+      create_statement_sql = "format('CREATE DATABASE %I OWNER %I', '${var.db_name}', '${var.nextcloud_db_username}')"
       database_exists_sql  = "SELECT 1 FROM pg_database WHERE datname = '${var.db_name}'"
       bootstrap_sql        = <<-EOSCHEMA
         SELECT EXISTS (
