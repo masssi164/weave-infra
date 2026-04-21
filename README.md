@@ -30,7 +30,7 @@ Run `make dev-hosts` from the repository root to print the default `/etc/hosts` 
 
 `install.sh` now defaults to a shared-host-safe isolated port block, generates secrets and local TLS certificates when they are not already exported as `TF_VAR_*`, applies both Terraform stages in order, waits for readiness, and bootstraps the Nextcloud `user_oidc` app.
 
-For repeatable local runs, generated bootstrap inputs are persisted in `weave-workspace/.generated/bootstrap.env` and reused on subsequent installs unless you override them explicitly with environment variables.
+For repeatable local runs, generated bootstrap inputs are persisted in `weave-workspace/.generated/bootstrap.env`, mirrored to `/tmp/weave-infra/weave-workspace/.generated/bootstrap.env` for the self-hosted GitHub runner flow, and reused on subsequent installs unless you override them explicitly with environment variables.
 
 The installer probes local services through `127.0.0.1` rather than bare `localhost` so Docker port checks stay reliable on hosts where IPv6 loopback behaves differently.
 
