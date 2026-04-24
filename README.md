@@ -54,6 +54,8 @@ bash ./teardown.sh
 
 Set `WEAVE_REMOVE_VOLUMES=true` when you also want to remove persisted Docker volumes such as `weave_synapse_data`.
 
+Terraform now keeps pulled service images in the local Docker cache during destroy, so shared-host cleanup no longer tries to delete upstream tags that may still be in use by unrelated containers on the same runner.
+
 ## TLS Setup
 
 The public local contract is HTTPS on these hostnames:

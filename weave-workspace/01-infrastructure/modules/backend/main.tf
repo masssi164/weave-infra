@@ -18,7 +18,8 @@ locals {
 }
 
 resource "docker_image" "this" {
-  name = var.image_name
+  name         = var.image_name
+  keep_locally = true
 }
 
 resource "docker_container" "this" {

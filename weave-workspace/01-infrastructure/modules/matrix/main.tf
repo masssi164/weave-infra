@@ -7,11 +7,13 @@ terraform {
 }
 
 resource "docker_image" "mas" {
-  name = var.mas_image_name
+  name         = var.mas_image_name
+  keep_locally = true
 }
 
 resource "docker_image" "synapse" {
-  name = var.synapse_image_name
+  name         = var.synapse_image_name
+  keep_locally = true
 }
 
 resource "docker_volume" "synapse_data" {
