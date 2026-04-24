@@ -57,7 +57,8 @@ export WEAVE_OIDC_CLIENT_ID=weave-app
 - Sign-in redirect URI: `com.massimotter.weave:/oauthredirect`
 - Post-logout redirect URI: `com.massimotter.weave:/logout`
 - Optional API scope: `weave:workspace`
-- Resource Owner Password Grant: disabled by default, enabled only when `create_test_user=true`
+- Resource Owner Password Grant: disabled
+- local smoke and integration validation use the standard browser login plus PKCE flow with the optional test user when that user is enabled
 
 The Flutter app must request `openid profile email weave:workspace` when it needs API tokens for the backend.
 

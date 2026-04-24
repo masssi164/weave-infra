@@ -185,6 +185,26 @@ load_persisted_env() {
   fi
 }
 
+resolve_backend_image_ref() {
+  local image_ref="${TF_VAR_weave_backend_image:-}"
+  local repo_digest
+
+  if [[ -z "${image_ref}" ]] || [[ "${image_ref}" == *@sha256:* ]]; then
+    return
+  fi
+
+  if ! docker image inspect "${image_ref}" >/dev/null 2>&1; then
+    return
+  fi
+
+  repo_digest="$(docker image inspect --format '{{join .RepoDigests "\n"}}' "${image_ref}" | head -n1)"
+  if [[ -z "${repo_digest}" || "${repo_digest}" == "<no value>" ]]; then
+    return
+  fi
+
+  export TF_VAR_weave_backend_image="${repo_digest}"
+}
+
 persist_bootstrap_env() {
   local var
 
@@ -197,6 +217,10 @@ persist_bootstrap_env() {
       printf 'export %s=%q\n' "${var}" "${!var}" >> "${BOOTSTRAP_ENV_FILE}"
     fi
   done
+
+  {
+    printf 'export WEAVE_BACKEND_IMAGE=%q\n' "${TF_VAR_weave_backend_image}"
+  } >> "${BOOTSTRAP_ENV_FILE}"
 
   if create_test_user_enabled; then
     {
@@ -670,6 +694,7 @@ print_summary() {
   log "Nextcloud admin: ${TF_VAR_nextcloud_admin_username} / ${TF_VAR_nextcloud_admin_password}"
   log "Nextcloud URL: ${nextcloud_url}"
   log "Weave backend URL: ${backend_url}"
+  log "Weave backend image: ${TF_VAR_weave_backend_image}"
   log "Weave backend health: http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/actuator/health"
 
   if create_test_user_enabled; then
@@ -691,6 +716,7 @@ main() {
   ensure_docker_provider_inputs
   ensure_generated_secrets
   ensure_local_tls_certificates
+  resolve_backend_image_ref
   persist_bootstrap_env
 
   log "Applying infrastructure module..."

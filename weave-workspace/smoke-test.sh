@@ -160,6 +160,7 @@ assert_json() {
 require_command curl
 require_command docker
 require_command jq
+require_command python3
 load_bootstrap_env
 
 CADDY_TLS_CA_FILE="${TF_VAR_caddy_tls_ca_file:-${DEFAULT_CADDY_TLS_CA_FILE}}"
@@ -176,19 +177,24 @@ issuer_config="$(curl_json "${WEAVE_OIDC_ISSUER_URL}/.well-known/openid-configur
 assert_json "${issuer_config}" ".issuer == \"${WEAVE_OIDC_ISSUER_URL}\"" "Keycloak issuer should match the public contract"
 assert_json "${issuer_config}" '.jwks_uri | startswith("http")' "Keycloak discovery should expose a JWKS URI"
 
-token_endpoint="$(jq -r '.token_endpoint' <<<"${issuer_config}")"
+if [[ -n "${TF_VAR_weave_backend_image:-}" ]] && docker image inspect "${TF_VAR_weave_backend_image}" >/dev/null 2>&1; then
+  expected_backend_image_id="$(docker image inspect --format '{{.Id}}' "${TF_VAR_weave_backend_image}")"
+  running_backend_image_id="$(docker inspect --format '{{.Image}}' weave-backend)"
+  [[ "${expected_backend_image_id}" == "${running_backend_image_id}" ]] || fail "Smoke check failed: weave-backend is not running the expected image ${TF_VAR_weave_backend_image}"
+fi
 
 log "Checking public backend health..."
 backend_health="$(curl_json "${WEAVE_BASE_URL}/actuator/health")"
 assert_json "${backend_health}" '.status == "UP"' "Backend health should report UP"
 
-log "Minting a real app token through Keycloak..."
-token_response="$(curl_form "${token_endpoint}" \
-  --data-urlencode grant_type=password \
-  --data-urlencode client_id="${WEAVE_OIDC_CLIENT_ID}" \
-  --data-urlencode username="${WEAVE_TEST_USERNAME}" \
-  --data-urlencode password="${WEAVE_TEST_PASSWORD}" \
-  --data-urlencode scope='openid profile email weave:workspace')"
+log "Minting a real app token through the browser-grade PKCE flow..."
+token_response="$(python3 "${ROOT_DIR}/oidc_auth_code_token.py" \
+  --issuer "${WEAVE_OIDC_ISSUER_URL}" \
+  --client-id "${WEAVE_OIDC_CLIENT_ID}" \
+  --username "${WEAVE_TEST_USERNAME}" \
+  --password "${WEAVE_TEST_PASSWORD}" \
+  --scope 'openid profile email weave:workspace' \
+  --ca-file "${CADDY_TLS_CA_FILE}")"
 access_token="$(jq -r '.access_token' <<<"${token_response}")"
 [[ -n "${access_token}" && "${access_token}" != "null" ]] || fail "Smoke check failed: Keycloak did not return an access token"
 

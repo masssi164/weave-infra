@@ -43,7 +43,7 @@ locals {
       client_id                    = "weave-app"
       access_type                  = "PUBLIC"
       standard_flow_enabled        = true
-      direct_access_grants_enabled = var.create_test_user
+      direct_access_grants_enabled = false
       pkce_code_challenge_method   = "S256"
       valid_redirect_uris          = ["com.massimotter.weave:/oauthredirect"]
       valid_post_logout_redirect_uris = [

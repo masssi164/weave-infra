@@ -117,7 +117,7 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>_synapse`
 - `<db_name>` (Nextcloud stores its tables in schema `nextcloud` here)
 
-The Weave backend is deployed as `weave-backend`, routed at `api.<tenant_domain>`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`.
+The Weave backend is deployed as `weave-backend`, routed at `api.<tenant_domain>`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`. When the image is already present locally, `install.sh` resolves it to a repo digest before persisting bootstrap state so reruns and smoke verification stay pinned to the exact pulled backend artifact.
 
 If that backend image is private in GHCR, authenticate the Docker client before running `install.sh` or `smoke-test.sh`. The consumer side should use an explicit `docker login ghcr.io` step or a CI login action rather than relying on an ambient cached session.
 
@@ -129,7 +129,8 @@ That target is documented in `docs/release-1-single-host.md` and is intentionall
 
 - local development may use generated secrets, a generated local CA, and an optional test user
 - Release 1 should use explicit secrets, publicly trusted certificates, pinned images, and `TF_VAR_create_test_user=false`
-- local smoke coverage depends on the test user contract, while release verification uses public endpoint checks only
+- local smoke coverage depends on the test user contract, but now signs in through the same browser-grade authorization-code-with-PKCE path as the app instead of relying on password grant enablement
+- release verification uses public endpoint checks only
 
 Use `weave-workspace/release.env.example` as the starting point for a real deployment env file.
 
@@ -216,7 +217,8 @@ The default Keycloak client contract for the Weave mobile app is:
 - sign-in redirect URI: `com.massimotter.weave:/oauthredirect`
 - post-logout redirect URI: `com.massimotter.weave:/logout`
 - optional API scope: `weave:workspace`
-- Resource Owner Password Grant: disabled by default, enabled only when `TF_VAR_create_test_user=true`
+- Resource Owner Password Grant: disabled
+- local smoke validation still supports the optional test user, but authenticates through the standard browser login plus PKCE flow
 
 The backend resource server contract is:
 

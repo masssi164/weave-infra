@@ -103,6 +103,16 @@ jobs:
       - name: Pull backend image for smoke stack
         run: docker pull "${WEAVE_BACKEND_IMAGE}"
 
+      - name: Resolve backend image to an immutable digest
+        run: |
+          resolved_image="$(docker image inspect --format '{{join .RepoDigests "\n"}}' "${WEAVE_BACKEND_IMAGE}" | head -n1)"
+          if [[ -z "${resolved_image}" || "${resolved_image}" == "<no value>" ]]; then
+            echo "Unable to resolve an immutable digest for ${WEAVE_BACKEND_IMAGE}" >&2
+            exit 1
+          fi
+          echo "WEAVE_BACKEND_IMAGE=${resolved_image}" >> "$GITHUB_ENV"
+          echo "Resolved backend image: ${resolved_image}"
+
       - name: Bootstrap the local stack with a smoke-test user
         env:
           TF_VAR_create_test_user: "true"
