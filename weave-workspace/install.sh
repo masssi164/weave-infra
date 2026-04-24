@@ -270,31 +270,22 @@ nextcloud_db_exec() {
     psql -v ON_ERROR_STOP=1 -U "${TF_VAR_db_admin_username}" -d "${database_name}" "$@"
 }
 
-nextcloud_db_has_stale_state() {
+nextcloud_schema_has_stale_state() {
   local nextcloud_database_name="$1"
   local table_count
 
-  table_count="$(nextcloud_db_exec "${nextcloud_database_name}" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema');" | tr -d '[:space:]')"
+  table_count="$(nextcloud_db_exec "${nextcloud_database_name}" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'nextcloud';" | tr -d '[:space:]')"
   [[ -n "${table_count}" && "${table_count}" != "0" ]]
 }
 
-reset_nextcloud_database() {
+reset_nextcloud_schema() {
   local nextcloud_database_name="$1"
 
-  log "Resetting stale Nextcloud database state in ${nextcloud_database_name} before reinstall..."
-
-  docker exec -e PGPASSWORD="${TF_VAR_db_admin_password}" weave-db \
-    psql -v ON_ERROR_STOP=1 -U "${TF_VAR_db_admin_username}" -d postgres <<SQL
-SELECT pg_terminate_backend(pid)
-FROM pg_stat_activity
-WHERE datname = '${nextcloud_database_name}'
-  AND pid <> pg_backend_pid();
-DROP DATABASE IF EXISTS "${nextcloud_database_name}";
-CREATE DATABASE "${nextcloud_database_name}" OWNER "${TF_VAR_nextcloud_db_username}";
-SQL
+  log "Resetting stale Nextcloud schema state in ${nextcloud_database_name} before reinstall..."
 
   nextcloud_db_exec "${nextcloud_database_name}" <<SQL
-CREATE SCHEMA IF NOT EXISTS nextcloud AUTHORIZATION "${TF_VAR_nextcloud_db_username}";
+DROP SCHEMA IF EXISTS nextcloud CASCADE;
+CREATE SCHEMA nextcloud AUTHORIZATION "${TF_VAR_nextcloud_db_username}";
 ALTER SCHEMA nextcloud OWNER TO "${TF_VAR_nextcloud_db_username}";
 GRANT USAGE, CREATE ON SCHEMA nextcloud TO "${TF_VAR_nextcloud_db_username}";
 ALTER ROLE "${TF_VAR_nextcloud_db_username}" IN DATABASE "${nextcloud_database_name}" SET search_path TO nextcloud, public;
@@ -583,8 +574,8 @@ ensure_nextcloud_installed() {
 
   nextcloud_database_name="$(terraform_output_raw "${INFRA_DIR}" nextcloud_database_name)"
 
-  if nextcloud_db_has_stale_state "${nextcloud_database_name}"; then
-    reset_nextcloud_database "${nextcloud_database_name}"
+  if nextcloud_schema_has_stale_state "${nextcloud_database_name}"; then
+    reset_nextcloud_schema "${nextcloud_database_name}"
   fi
 
   occ maintenance:install \
