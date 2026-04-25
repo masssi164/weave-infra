@@ -435,6 +435,7 @@ ensure_generated_secrets() {
     set_default_secret TF_VAR_test_user_password "$(random_base64 16)"
   fi
   ensure_mas_signing_key
+  export TF_VAR_mas_signing_key_pem
 }
 
 certificate_alt_names() {
