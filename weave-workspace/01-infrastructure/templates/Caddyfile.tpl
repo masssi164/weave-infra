@@ -37,7 +37,7 @@ ${matrix_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
-	@matrix_auth path_regexp matrix_auth ^/_matrix/client/.*/(login|logout|refresh)$
+	@matrix_auth path_regexp matrix_auth ^/_matrix/client/(v1/auth_metadata|.*/(login|logout|refresh))$
 	@matrix_client_well_known path /.well-known/matrix/client
 	@synapse path /_matrix/* /_synapse/client/* /_synapse/mas/* /.well-known/matrix/*
 

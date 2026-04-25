@@ -136,4 +136,8 @@ assert_json "${nextcloud_status}" '.installed == true' "Nextcloud should be inst
 mas_discovery="$(curl_json "${WEAVE_MATRIX_URL}/.well-known/openid-configuration")"
 assert_json "${mas_discovery}" ".issuer == \"${WEAVE_MATRIX_URL}/\"" "MAS issuer should match the public matrix URL"
 
+matrix_auth_metadata="$(curl_json "${WEAVE_MATRIX_URL}/_matrix/client/v1/auth_metadata")"
+assert_json "${matrix_auth_metadata}" ".issuer == \"${WEAVE_MATRIX_URL}/\"" "Matrix OAuth metadata should be served by MAS"
+assert_json "${matrix_auth_metadata}" '.authorization_endpoint | contains("/authorize")' "Matrix OAuth metadata should expose the MAS authorization endpoint"
+
 log "Operator checks passed."
