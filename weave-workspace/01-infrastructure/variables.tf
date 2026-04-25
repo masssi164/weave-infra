@@ -188,9 +188,9 @@ variable "keycloak_image" {
 }
 
 variable "mas_image" {
-  description = "Matrix Authentication Service image."
+  description = "Matrix Authentication Service image. The synapse_modern homeserver adapter requires MAS 0.20.0 or later."
   type        = string
-  default     = "ghcr.io/element-hq/matrix-authentication-service:0.14.0"
+  default     = "ghcr.io/element-hq/matrix-authentication-service:0.20.0"
 }
 
 variable "synapse_image" {
