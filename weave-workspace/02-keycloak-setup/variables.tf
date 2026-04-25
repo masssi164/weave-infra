@@ -18,7 +18,7 @@ variable "tenant_domain" {
 variable "auth_subdomain" {
   description = "Subdomain used for Keycloak."
   type        = string
-  default     = "keycloak"
+  default     = "auth"
 }
 
 variable "matrix_subdomain" {
@@ -28,13 +28,13 @@ variable "matrix_subdomain" {
 }
 
 variable "nextcloud_subdomain" {
-  description = "Subdomain used for Nextcloud."
+  description = "Subdomain used for the canonical Nextcloud URL."
   type        = string
-  default     = "nextcloud"
+  default     = "files"
 }
 
 variable "api_subdomain" {
-  description = "Subdomain reserved for the Weave backend API."
+  description = "Deprecated compatibility input. The backend API is exposed at the product gateway /api path."
   type        = string
   default     = "api"
 }

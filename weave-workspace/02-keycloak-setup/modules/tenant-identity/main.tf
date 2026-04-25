@@ -20,6 +20,15 @@ locals {
     "microprofile-jwt",
     "offline_access",
     "phone",
+  ]
+
+  weave_app_default_scopes = [
+    "acr",
+    "basic",
+    "email",
+    "profile",
+    "roles",
+    "web-origins",
     "weave:workspace",
   ]
 
@@ -83,10 +92,10 @@ locals {
 resource "keycloak_realm" "tenant" {
   realm                          = var.tenant_slug
   enabled                        = true
-  registration_allowed           = true
+  registration_allowed           = false
   login_with_email_allowed       = true
   registration_email_as_username = false
-  edit_username_allowed          = true
+  edit_username_allowed          = false
   reset_password_allowed         = true
   duplicate_emails_allowed       = false
 }
@@ -150,6 +159,17 @@ resource "keycloak_openid_client_optional_scopes" "weave_app" {
   client_id = keycloak_openid_client.client["weave_app"].id
 
   optional_scopes = local.weave_app_optional_scopes
+
+  depends_on = [
+    keycloak_openid_client_scope.weave_workspace,
+  ]
+}
+
+resource "keycloak_openid_client_default_scopes" "weave_app" {
+  realm_id  = keycloak_realm.tenant.id
+  client_id = keycloak_openid_client.client["weave_app"].id
+
+  default_scopes = local.weave_app_default_scopes
 
   depends_on = [
     keycloak_openid_client_scope.weave_workspace,

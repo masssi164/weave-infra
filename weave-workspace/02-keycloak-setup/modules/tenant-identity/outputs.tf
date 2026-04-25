@@ -28,6 +28,11 @@ output "weave_app_optional_scopes" {
   value       = keycloak_openid_client_optional_scopes.weave_app.optional_scopes
 }
 
+output "weave_app_default_scopes" {
+  description = "Default scopes assigned to the Weave mobile app."
+  value       = keycloak_openid_client_default_scopes.weave_app.default_scopes
+}
+
 output "weave_backend_client_id" {
   description = "Client ID configured for the Weave backend."
   value       = keycloak_openid_client.client["weave_backend"].client_id

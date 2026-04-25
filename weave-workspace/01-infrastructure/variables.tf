@@ -35,7 +35,7 @@ variable "tenant_domain" {
 variable "auth_subdomain" {
   description = "Subdomain used for Keycloak."
   type        = string
-  default     = "keycloak"
+  default     = "auth"
 }
 
 variable "matrix_subdomain" {
@@ -45,13 +45,13 @@ variable "matrix_subdomain" {
 }
 
 variable "nextcloud_subdomain" {
-  description = "Subdomain used for Nextcloud."
+  description = "Subdomain used for the canonical Nextcloud URL."
   type        = string
-  default     = "nextcloud"
+  default     = "files"
 }
 
 variable "api_subdomain" {
-  description = "Subdomain reserved for the Weave backend API."
+  description = "Deprecated compatibility input. The backend API is exposed at the product gateway /api path."
   type        = string
   default     = "api"
 }
@@ -136,7 +136,7 @@ variable "backend_container_port" {
 variable "weave_backend_image" {
   description = "Docker image for the Weave backend service."
   type        = string
-  default     = "ghcr.io/masssi164/weave-backend:latest"
+  default     = "weave-backend:local"
 }
 
 variable "nextcloud_trusted_proxies" {
@@ -188,15 +188,15 @@ variable "keycloak_image" {
 }
 
 variable "mas_image" {
-  description = "Matrix Authentication Service image."
+  description = "Matrix Authentication Service image. The default supports the synapse_modern adapter and localpart conflict mode used by the generated config."
   type        = string
-  default     = "ghcr.io/element-hq/matrix-authentication-service:0.14.0"
+  default     = "ghcr.io/element-hq/matrix-authentication-service:1.15.0"
 }
 
 variable "synapse_image" {
-  description = "Synapse image."
+  description = "Synapse image. Matrix Authentication Service delegated auth requires Synapse 1.136.0 or later."
   type        = string
-  default     = "matrixdotorg/synapse:v1.127.1"
+  default     = "matrixdotorg/synapse:v1.136.0"
 }
 
 variable "nextcloud_image" {

@@ -21,19 +21,19 @@ Services on the host:
 
 Operators should expose these HTTPS origins:
 
-- `https://auth.<tenant_domain>` or `https://keycloak.<tenant_domain>`
+- `https://<tenant_domain>` for the Weave product gateway and `/api`, `/files`, `/calendar` routes
+- `https://auth.<tenant_domain>`
 - `https://matrix.<tenant_domain>`
-- `https://files.<tenant_domain>` or `https://nextcloud.<tenant_domain>`
-- `https://api.<tenant_domain>`
+- `https://files.<tenant_domain>` as the canonical Nextcloud URL
 
 For the current preferred contract, use:
 
+- `https://weave.example`
 - `https://auth.weave.example`
 - `https://matrix.weave.example`
 - `https://files.weave.example`
-- `https://api.weave.example`
 
-If you keep the repo defaults, use `keycloak` and `nextcloud` instead of `auth` and `files`. Pick one public contract and keep backend, mobile, Caddy, and operator docs aligned.
+Older `keycloak`, `nextcloud`, or `api` subdomains are compatibility aliases only when an operator intentionally preserves them. Pick one public contract and keep backend, mobile, Caddy, and operator docs aligned.
 
 ## Required operator inputs
 
@@ -43,7 +43,6 @@ Set these explicitly before the first apply:
 - `TF_VAR_auth_subdomain`
 - `TF_VAR_matrix_subdomain`
 - `TF_VAR_nextcloud_subdomain`
-- `TF_VAR_api_subdomain`
 - `TF_VAR_public_scheme=https`
 - `TF_VAR_caddy_tls_cert_file`
 - `TF_VAR_caddy_tls_key_file`
@@ -73,6 +72,8 @@ Minimum expectation:
 
 - pin `TF_VAR_weave_backend_image` to a version or immutable digest
 - pin Terraform-managed service images when the module variables expose them
+- keep the default `TF_VAR_mas_image` unless an override has been validated against the generated `synapse_modern` config and localpart conflict policy
+- keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later so Matrix Authentication Service delegated auth can call the homeserver MAS API
 - record the chosen image set in the deployment change or release note
 
 ## Persistence expectations
@@ -108,8 +109,8 @@ Use `weave-workspace/release-verify.sh` with:
 
 - `WEAVE_BASE_URL`
 - `WEAVE_OIDC_ISSUER_URL`
-- `WEAVE_NEXTCLOUD_URL`
-- `WEAVE_MATRIX_URL`
+- `WEAVE_NEXTCLOUD_BASE_URL` (`WEAVE_NEXTCLOUD_URL` is accepted as a compatibility alias)
+- `WEAVE_MATRIX_HOMESERVER_URL` (`WEAVE_MATRIX_URL` is accepted as a compatibility alias)
 - optional `WEAVE_TLS_CA_FILE` when a private CA is required
 
 The script checks:

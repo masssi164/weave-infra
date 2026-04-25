@@ -22,7 +22,7 @@ database:
   ssl_mode: disable
 
 matrix:
-  kind: synapse
+  kind: synapse_modern
   homeserver: ${matrix_homeserver}
   endpoint: ${matrix_endpoint}
   secret: ${matrix_secret}

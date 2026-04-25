@@ -24,10 +24,10 @@ locals {
   ) ? "" : ":${var.proxy_host_port}"
 
   public_hosts = {
+    weave     = var.tenant_domain
     keycloak  = "${var.auth_subdomain}.${var.tenant_domain}"
     matrix    = "${var.matrix_subdomain}.${var.tenant_domain}"
     nextcloud = "${var.nextcloud_subdomain}.${var.tenant_domain}"
-    api       = "${var.api_subdomain}.${var.tenant_domain}"
   }
 
   public_urls = {

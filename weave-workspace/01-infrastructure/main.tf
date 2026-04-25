@@ -34,10 +34,10 @@ locals {
   ) ? "" : ":${var.proxy_host_port}"
 
   public_hosts = {
+    weave     = var.tenant_domain
     keycloak  = "${var.auth_subdomain}.${var.tenant_domain}"
     matrix    = "${var.matrix_subdomain}.${var.tenant_domain}"
     nextcloud = "${var.nextcloud_subdomain}.${var.tenant_domain}"
-    api       = "${var.api_subdomain}.${var.tenant_domain}"
   }
 
   public_urls = {
@@ -54,12 +54,14 @@ locals {
   caddy_certs_dir     = dirname(local.caddy_tls_cert_file)
   caddyfile_path      = abspath("${path.module}/.generated/caddy/Caddyfile")
   caddyfile_content = templatefile("${path.module}/templates/Caddyfile.tpl", {
+    weave_site_addresses     = local.public_port_suffix == "" ? "https://${local.public_hosts.weave}" : "https://${local.public_hosts.weave}, https://${local.public_hosts.weave}${local.public_port_suffix}"
     keycloak_site_addresses  = local.public_port_suffix == "" ? "https://${local.public_hosts.keycloak}" : "https://${local.public_hosts.keycloak}, https://${local.public_hosts.keycloak}${local.public_port_suffix}"
     nextcloud_site_addresses = local.public_port_suffix == "" ? "https://${local.public_hosts.nextcloud}" : "https://${local.public_hosts.nextcloud}, https://${local.public_hosts.nextcloud}${local.public_port_suffix}"
     matrix_site_addresses    = local.public_port_suffix == "" ? "https://${local.public_hosts.matrix}" : "https://${local.public_hosts.matrix}, https://${local.public_hosts.matrix}${local.public_port_suffix}"
-    api_site_addresses       = local.public_port_suffix == "" ? "https://${local.public_hosts.api}" : "https://${local.public_hosts.api}, https://${local.public_hosts.api}${local.public_port_suffix}"
     keycloak_upstream        = "${local.service_names.keycloak}:8080"
     nextcloud_upstream       = "${local.service_names.nextcloud}:80"
+    nextcloud_public_url     = local.public_urls.nextcloud
+    matrix_public_url        = local.public_urls.matrix
     mas_upstream             = "${local.service_names.mas}:8080"
     synapse_upstream         = "${local.service_names.synapse}:8008"
     # Backend is routed via Caddy (api_upstream); no Traefik labels needed
@@ -265,9 +267,9 @@ resource "terraform_data" "postgres_bootstrap" {
       set -euo pipefail
 
       for attempt in $(seq 1 60); do
-        if docker exec "$${CONTAINER_NAME}" pg_isready -U "$${DATABASE_USER}" -d "$${DATABASE_NAME}" >/dev/null 2>&1; then
+        if docker exec "$${CONTAINER_NAME}" pg_isready -h 127.0.0.1 -U "$${DATABASE_USER}" -d "$${DATABASE_NAME}" >/dev/null 2>&1; then
           docker exec -e PGPASSWORD="$${DATABASE_PASS}" -i "$${CONTAINER_NAME}" \
-            psql -v ON_ERROR_STOP=1 -U "$${DATABASE_USER}" -d "$${DATABASE_NAME}" < "$${SQL_FILE}"
+            psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$${DATABASE_USER}" -d "$${DATABASE_NAME}" < "$${SQL_FILE}"
           exit 0
         fi
 
@@ -330,7 +332,14 @@ module "backend" {
   image_name             = var.weave_backend_image
   host_port              = var.backend_host_port
   container_port         = var.backend_container_port
-  public_host            = local.public_hosts.api
+  public_host            = local.public_hosts.weave
+  public_base_url        = local.public_urls.weave
+  api_base_url           = "${local.public_urls.weave}/api"
+  auth_base_url          = local.public_urls.keycloak
+  matrix_base_url        = local.public_urls.matrix
+  files_product_url      = "${local.public_urls.weave}/files"
+  calendar_product_url   = "${local.public_urls.weave}/calendar"
+  nextcloud_base_url     = local.public_urls.nextcloud
   oidc_issuer_uri        = local.keycloak_issuer_url
   oidc_jwk_set_uri       = local.keycloak_jwk_set_uri
   oidc_required_audience = local.weave_backend_audience

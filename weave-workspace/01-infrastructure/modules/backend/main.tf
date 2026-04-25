@@ -6,17 +6,6 @@ terraform {
   }
 }
 
-locals {
-  # Issue #3 tracks any future Caddy migration; the API host route is currently implemented with Traefik labels.
-  traefik_labels = {
-    "traefik.enable"                                               = "true"
-    "traefik.docker.network"                                       = var.network_name
-    "traefik.http.routers.weave-backend.rule"                      = "Host(`${var.public_host}`)"
-    "traefik.http.routers.weave-backend.entrypoints"               = "web"
-    "traefik.http.services.weave-backend.loadbalancer.server.port" = tostring(var.container_port)
-  }
-}
-
 resource "docker_image" "this" {
   name         = var.image_name
   keep_locally = true
@@ -34,6 +23,14 @@ resource "docker_container" "this" {
     "WEAVE_OIDC_JWK_SET_URI=${var.oidc_jwk_set_uri}",
     "WEAVE_OIDC_REQUIRED_AUDIENCE=${var.oidc_required_audience}",
     "WEAVE_CLIENT_ID=${var.client_id}",
+    "WEAVE_PUBLIC_BASE_URL=${var.public_base_url}",
+    "WEAVE_API_BASE_URL=${var.api_base_url}",
+    "WEAVE_AUTH_BASE_URL=${var.auth_base_url}",
+    "WEAVE_MATRIX_BASE_URL=${var.matrix_base_url}",
+    "WEAVE_FILES_PRODUCT_URL=${var.files_product_url}",
+    "WEAVE_CALENDAR_PRODUCT_URL=${var.calendar_product_url}",
+    "WEAVE_MATRIX_HOMESERVER_URL=${var.matrix_base_url}",
+    "WEAVE_NEXTCLOUD_BASE_URL=${var.nextcloud_base_url}",
   ]
 
   ports {
@@ -50,14 +47,6 @@ resource "docker_container" "this" {
     timeout      = "5s"
     retries      = 12
     start_period = "30s"
-  }
-
-  dynamic "labels" {
-    for_each = local.traefik_labels
-    content {
-      label = labels.key
-      value = labels.value
-    }
   }
 
   networks_advanced {
