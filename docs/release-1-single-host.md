@@ -21,19 +21,19 @@ Services on the host:
 
 Operators should expose these HTTPS origins:
 
-- `https://auth.<tenant_domain>` or `https://keycloak.<tenant_domain>`
+- `https://<tenant_domain>` for the Weave product gateway and `/api`, `/files`, `/calendar` routes
+- `https://auth.<tenant_domain>`
 - `https://matrix.<tenant_domain>`
-- `https://files.<tenant_domain>` or `https://nextcloud.<tenant_domain>`
-- `https://api.<tenant_domain>`
+- `https://files.<tenant_domain>` as the raw Nextcloud fallback
 
 For the current preferred contract, use:
 
+- `https://weave.example`
 - `https://auth.weave.example`
 - `https://matrix.weave.example`
 - `https://files.weave.example`
-- `https://api.weave.example`
 
-If you keep the repo defaults, use `keycloak` and `nextcloud` instead of `auth` and `files`. Pick one public contract and keep backend, mobile, Caddy, and operator docs aligned.
+Older `keycloak`, `nextcloud`, or `api` subdomains are compatibility aliases only when an operator intentionally preserves them. Pick one public contract and keep backend, mobile, Caddy, and operator docs aligned.
 
 ## Required operator inputs
 
@@ -43,7 +43,6 @@ Set these explicitly before the first apply:
 - `TF_VAR_auth_subdomain`
 - `TF_VAR_matrix_subdomain`
 - `TF_VAR_nextcloud_subdomain`
-- `TF_VAR_api_subdomain`
 - `TF_VAR_public_scheme=https`
 - `TF_VAR_caddy_tls_cert_file`
 - `TF_VAR_caddy_tls_key_file`

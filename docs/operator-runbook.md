@@ -7,10 +7,10 @@ It is meant to remove the remaining tribal knowledge around install, verify, rec
 
 Prepare these explicitly:
 
-- DNS for `auth.<tenant_domain>` or `keycloak.<tenant_domain>`
+- DNS for `<tenant_domain>` for the Weave product gateway
+- DNS for `auth.<tenant_domain>`
 - DNS for `matrix.<tenant_domain>`
-- DNS for `files.<tenant_domain>` or `nextcloud.<tenant_domain>`
-- DNS for `api.<tenant_domain>`
+- DNS for `files.<tenant_domain>` as the raw Nextcloud fallback
 - a filled, private copy of `weave-workspace/release.env.example`
 - pinned image references, especially `TF_VAR_weave_backend_image`
 - TLS certificate and key readable by the operator account

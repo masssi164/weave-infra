@@ -90,8 +90,8 @@ assert_json "${issuer_config}" ".issuer == \"${WEAVE_OIDC_ISSUER_URL}\"" "issuer
 assert_json "${issuer_config}" '.jwks_uri | startswith("http")' "jwks_uri should be present"
 
 log "Checking backend health through the public API URL..."
-backend_health="$(curl_json "${WEAVE_BASE_URL}/actuator/health")"
-assert_json "${backend_health}" '.status == "UP"' "backend health should report UP"
+backend_health="$(curl_json "${WEAVE_BASE_URL}/health/ready")"
+assert_json "${backend_health}" '.status == "up"' "backend readiness should report up"
 
 log "Checking Nextcloud public status..."
 nextcloud_status="$(curl_json "${WEAVE_NEXTCLOUD_URL}/status.php")"

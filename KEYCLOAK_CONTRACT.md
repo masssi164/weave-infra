@@ -5,13 +5,13 @@ This is the local identity contract for the Weave self-hosted development stack.
 ## Realm
 
 - Realm name: `weave`
-- Default public issuer URI: `https://keycloak.weave.local/realms/weave`
+- Default public issuer URI: `https://auth.weave.local/realms/weave`
 - Terraform source: `weave-workspace/02-keycloak-setup/modules/tenant-identity`
 
 The issuer URI follows the infrastructure inputs:
 
 - `tenant_slug`: realm name, default `weave`
-- `auth_subdomain`: default `keycloak`
+- `auth_subdomain`: default `auth`
 - `tenant_domain`: default `weave.local`
 - `public_scheme`: default `https`
 - `proxy_host_port`: default `443`
@@ -26,7 +26,7 @@ Enable it with `TF_VAR_create_test_user=true` when running `weave-workspace/inst
 - Email and login identifier: `test@weave.local`
 - First name: `Test`
 - Last name: `User`
-- Password: `<generated — see install.sh output or bootstrap.env>`
+- Password: `<generated — see bootstrap.env>`
 - Email verified: true
 - Temporary password: false
 
@@ -34,14 +34,14 @@ For integration tests, use:
 
 ```bash
 export WEAVE_TEST_USERNAME=test@weave.local
-export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.env>'
+export WEAVE_TEST_PASSWORD='<generated — see bootstrap.env>'
 ```
 
 `install.sh` also writes non-secret Flutter integration settings when the test user is enabled:
 
 ```bash
-export WEAVE_BASE_URL=https://api.weave.local
-export WEAVE_OIDC_ISSUER_URL=https://keycloak.weave.local/realms/weave
+export WEAVE_BASE_URL=https://weave.local/api
+export WEAVE_OIDC_ISSUER_URL=https://auth.weave.local/realms/weave
 export WEAVE_OIDC_CLIENT_ID=weave-app
 ```
 
@@ -68,11 +68,11 @@ The Flutter app must request `openid profile email weave:workspace` when it need
 - Expected token audience: `weave-app`
 - Expected token `azp` or `client_id`: `weave-app`
 - Backend environment:
-  - `WEAVE_OIDC_ISSUER_URI=https://keycloak.weave.local/realms/weave`
+  - `WEAVE_OIDC_ISSUER_URI=https://auth.weave.local/realms/weave`
   - `WEAVE_OIDC_JWK_SET_URI=http://weave-keycloak:8080/realms/weave/protocol/openid-connect/certs`
   - `WEAVE_OIDC_REQUIRED_AUDIENCE=weave-app`
   - `WEAVE_CLIENT_ID=weave-app`
-- Public API URL: `https://api.weave.local`
+- Public API URL: `https://weave.local/api`
 - Direct health URL: `http://127.0.0.1:8084/actuator/health`
 
 ### Matrix Authentication Service
@@ -86,9 +86,9 @@ The Flutter app must request `openid profile email weave:workspace` when it need
 
 - Client ID: `nextcloud`
 - Access type: confidential
-- Redirect URI: `https://nextcloud.weave.local/*`
-- Post-logout redirect URI: `https://nextcloud.weave.local/*`
-- Backchannel logout URL: `https://nextcloud.weave.local/index.php/apps/user_oidc/backchannel-logout/keycloak`
+- Redirect URI: `https://files.weave.local/*`
+- Post-logout redirect URI: `https://files.weave.local/*`
+- Backchannel logout URL: `https://files.weave.local/index.php/apps/user_oidc/backchannel-logout/keycloak`
 - Token claims include `groups` for Nextcloud group provisioning.
 
 ## Client Scopes
@@ -97,7 +97,7 @@ The Flutter app must request `openid profile email weave:workspace` when it need
 
 - Type: OpenID client scope
 - `include_in_token_scope`: true
-- Assigned to `weave-app` as an optional scope
+- Assigned to `weave-app` as a default scope
 - Purpose: API access scope for Weave workspace operations
 
 The scope carries an audience mapper:
@@ -112,7 +112,7 @@ The scope carries an audience mapper:
 
 A mobile access token requested with `weave:workspace` must include:
 
-- `iss`: `https://keycloak.weave.local/realms/weave`
+- `iss`: `https://auth.weave.local/realms/weave`
 - `azp`: `weave-app`
 - `client_id`: `weave-app` when present
 - `aud`: includes `weave-app`
@@ -133,6 +133,7 @@ The Keycloak setup stage exports:
 - `weave_app_client_id`
 - `weave_app_redirect_uris`
 - `weave_app_post_logout_redirect_uris`
+- `weave_app_default_scopes`
 - `weave_app_optional_scopes`
 - `weave_workspace_scope_name`
 - `weave_backend_client_id`
@@ -148,5 +149,5 @@ The infrastructure stage exports:
 - `weave_backend_oidc_jwk_set_uri`
 - `weave_backend_required_audience`
 - `weave_backend_client_id`
-- `public_urls.api`
+- `public_urls.weave` with the backend available at `/api`
 - `service_names.backend`

@@ -23,7 +23,6 @@ readonly PERSISTED_TF_VARS=(
   TF_VAR_auth_subdomain
   TF_VAR_matrix_subdomain
   TF_VAR_nextcloud_subdomain
-  TF_VAR_api_subdomain
   TF_VAR_public_scheme
   TF_VAR_proxy_host_port
   TF_VAR_proxy_http_host_port
@@ -171,18 +170,18 @@ load_persisted_env() {
     unset TF_VAR_files_subdomain
   fi
 
-  # Migrate the legacy default Nextcloud hostname from files.<tenant_domain>
-  # to nextcloud.<tenant_domain> unless the caller already set a value.
+  # Migrate the legacy raw Nextcloud hostname from nextcloud.<tenant_domain>
+  # to files.<tenant_domain> unless the caller already set a value.
   if [[ ! "${preset_names_joined}" =~ " TF_VAR_nextcloud_subdomain " ]] &&
-    [[ "${TF_VAR_nextcloud_subdomain:-}" == "files" ]]; then
-    export TF_VAR_nextcloud_subdomain="nextcloud"
+    [[ "${TF_VAR_nextcloud_subdomain:-}" == "nextcloud" ]]; then
+    export TF_VAR_nextcloud_subdomain="files"
   fi
 
-  # Migrate the old Keycloak default from auth.<tenant_domain> to
-  # keycloak.<tenant_domain> unless the caller already set a value.
+  # Migrate the old Keycloak default from keycloak.<tenant_domain> to
+  # auth.<tenant_domain> unless the caller already set a value.
   if [[ ! "${preset_names_joined}" =~ " TF_VAR_auth_subdomain " ]] &&
-    [[ "${TF_VAR_auth_subdomain:-}" == "auth" ]]; then
-    export TF_VAR_auth_subdomain="keycloak"
+    [[ "${TF_VAR_auth_subdomain:-}" == "keycloak" ]]; then
+    export TF_VAR_auth_subdomain="auth"
   fi
 }
 
@@ -389,7 +388,7 @@ create_test_user_enabled() {
 }
 
 integration_test_base_url() {
-  printf '%s://%s%s' "${TF_VAR_public_scheme}" "$(public_host "${TF_VAR_api_subdomain}")" "$(public_port_suffix)"
+  printf '%s://%s%s/api' "${TF_VAR_public_scheme}" "${TF_VAR_tenant_domain}" "$(public_port_suffix)"
 }
 
 integration_test_oidc_issuer_url() {
@@ -457,10 +456,9 @@ ensure_default_inputs() {
     "TF_VAR_docker_network_name=weave_network"
     "TF_VAR_tenant_slug=weave"
     "TF_VAR_tenant_domain=weave.local"
-    "TF_VAR_auth_subdomain=keycloak"
+    "TF_VAR_auth_subdomain=auth"
     "TF_VAR_matrix_subdomain=matrix"
-    "TF_VAR_nextcloud_subdomain=nextcloud"
-    "TF_VAR_api_subdomain=api"
+    "TF_VAR_nextcloud_subdomain=files"
     "TF_VAR_public_scheme=https"
     "TF_VAR_proxy_host_port=44443"
     "TF_VAR_proxy_http_host_port=44080"
@@ -527,10 +525,10 @@ certificate_alt_names() {
   local index=1
   local host
   local hosts=(
+    "${TF_VAR_tenant_domain}"
     "$(public_host "${TF_VAR_auth_subdomain}")"
     "$(public_host "${TF_VAR_nextcloud_subdomain}")"
     "$(public_host "${TF_VAR_matrix_subdomain}")"
-    "$(public_host "${TF_VAR_api_subdomain}")"
   )
 
   for host in "${hosts[@]}"; do
@@ -704,13 +702,13 @@ print_summary() {
 
   suffix="$(public_port_suffix)"
   nextcloud_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_nextcloud_subdomain}")${suffix}"
-  backend_url="${TF_VAR_public_scheme}://$(public_host "${TF_VAR_api_subdomain}")${suffix}"
+  backend_url="${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}/api"
   issuer_url="$(integration_test_oidc_issuer_url)"
   weave_client_id="$(terraform_output_raw "${KEYCLOAK_DIR}" weave_app_client_id)"
 
   log
   log "Add these host entries before using the browser-facing URLs:"
-  log "127.0.0.1 $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}") $(public_host "${TF_VAR_api_subdomain}")"
+  log "127.0.0.1 ${TF_VAR_tenant_domain} $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}")"
   log
   log "Trust this local TLS CA certificate on the host before opening browser URLs:"
   log "${TF_VAR_caddy_tls_ca_file}"
@@ -718,15 +716,18 @@ print_summary() {
   log "Weave app client ID: ${weave_client_id}"
   log "Weave app sign-in redirect: com.massimotter.weave:/oauthredirect"
   log "Weave app post-logout redirect: com.massimotter.weave:/logout"
-  log "Keycloak admin: ${TF_VAR_keycloak_admin_username} / ${TF_VAR_keycloak_admin_password}"
-  log "Nextcloud admin: ${TF_VAR_nextcloud_admin_username} / ${TF_VAR_nextcloud_admin_password}"
-  log "Nextcloud URL: ${nextcloud_url}"
+  log "Keycloak admin user: ${TF_VAR_keycloak_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
+  log "Nextcloud admin user: ${TF_VAR_nextcloud_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
+  log "Raw Nextcloud fallback URL: ${nextcloud_url}"
+  log "Weave product URL: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}"
+  log "Weave product files route: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}/files"
+  log "Weave product calendar route: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}/calendar"
   log "Weave backend URL: ${backend_url}"
   log "Weave backend health: http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/actuator/health"
 
   if create_test_user_enabled; then
-    log "Test user: ${TEST_USER_EMAIL} / ${TF_VAR_test_user_password}"
-    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_OIDC_ISSUER_URL=${issuer_url} WEAVE_OIDC_CLIENT_ID=${weave_client_id} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=${TF_VAR_test_user_password}"
+    log "Test user: ${TEST_USER_EMAIL} (password stored in ${BOOTSTRAP_ENV_FILE})"
+    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_OIDC_ISSUER_URL=${issuer_url} WEAVE_OIDC_CLIENT_ID=${weave_client_id} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=<stored in bootstrap env>"
   fi
 }
 

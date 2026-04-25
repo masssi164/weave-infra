@@ -28,6 +28,41 @@ variable "public_host" {
   type        = string
 }
 
+variable "public_base_url" {
+  description = "Public Weave product base URL."
+  type        = string
+}
+
+variable "api_base_url" {
+  description = "Public Weave backend API base URL."
+  type        = string
+}
+
+variable "auth_base_url" {
+  description = "Public Keycloak/Auth base URL."
+  type        = string
+}
+
+variable "matrix_base_url" {
+  description = "Public Matrix base URL."
+  type        = string
+}
+
+variable "files_product_url" {
+  description = "Public Weave files product route."
+  type        = string
+}
+
+variable "calendar_product_url" {
+  description = "Public Weave calendar product route."
+  type        = string
+}
+
+variable "nextcloud_raw_base_url" {
+  description = "Raw Nextcloud fallback base URL."
+  type        = string
+}
+
 variable "oidc_issuer_uri" {
   description = "OIDC issuer URI consumed by the Weave backend."
   type        = string
