@@ -119,6 +119,8 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 
 The Weave backend is deployed as `weave-backend`, routed through `<tenant_domain>/api`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`.
 
+The Matrix stack uses Matrix Authentication Service delegated auth. Keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later; older Synapse images do not support the homeserver MAS API that MAS uses to provision and link users.
+
 If that backend image is private in GHCR, authenticate the Docker client before running `install.sh` or `smoke-test.sh`. The consumer side should use an explicit `docker login ghcr.io` step or a CI login action rather than relying on an ambient cached session.
 
 ## Release 1 target

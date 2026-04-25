@@ -72,6 +72,7 @@ Minimum expectation:
 
 - pin `TF_VAR_weave_backend_image` to a version or immutable digest
 - pin Terraform-managed service images when the module variables expose them
+- keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later so Matrix Authentication Service delegated auth can call the homeserver MAS API
 - record the chosen image set in the deployment change or release note
 
 ## Persistence expectations

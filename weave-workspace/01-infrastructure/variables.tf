@@ -194,9 +194,9 @@ variable "mas_image" {
 }
 
 variable "synapse_image" {
-  description = "Synapse image."
+  description = "Synapse image. Matrix Authentication Service delegated auth requires Synapse 1.136.0 or later."
   type        = string
-  default     = "matrixdotorg/synapse:v1.127.1"
+  default     = "matrixdotorg/synapse:v1.136.0"
 }
 
 variable "nextcloud_image" {
