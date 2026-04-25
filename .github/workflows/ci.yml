@@ -10,7 +10,11 @@ on:
       weave_backend_image:
         description: "Backend image to validate in the smoke stack"
         required: false
-        default: "ghcr.io/masssi164/weave-backend:latest"
+        default: "weave-backend:smoke-ci"
+      weave_backend_ref:
+        description: "Git ref to use when building the smoke-test backend image"
+        required: false
+        default: "main"
 
 permissions:
   contents: read
@@ -18,7 +22,8 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  WEAVE_BACKEND_IMAGE: ${{ github.event.inputs.weave_backend_image || 'ghcr.io/masssi164/weave-backend:latest' }}
+  WEAVE_BACKEND_IMAGE: ${{ github.event.inputs.weave_backend_image || 'weave-backend:smoke-ci' }}
+  REQUESTED_WEAVE_BACKEND_REF: ${{ github.event.inputs.weave_backend_ref || github.head_ref || github.ref_name || 'main' }}
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -93,15 +98,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes jq
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve backend ref
+        id: backend_ref
+        run: |
+          set -euo pipefail
 
-      - name: Pull backend image for smoke stack
-        run: docker pull "${WEAVE_BACKEND_IMAGE}"
+          if git ls-remote --exit-code --heads https://github.com/masssi164/weave-backend.git "${REQUESTED_WEAVE_BACKEND_REF}" >/dev/null 2>&1; then
+            backend_ref="${REQUESTED_WEAVE_BACKEND_REF}"
+          else
+            backend_ref="main"
+          fi
+
+          echo "ref=${backend_ref}" >> "$GITHUB_OUTPUT"
+          echo "Using weave-backend ref: ${backend_ref}"
+
+      - name: Check out backend repository
+        uses: actions/checkout@v6
+        with:
+          repository: masssi164/weave-backend
+          ref: ${{ steps.backend_ref.outputs.ref }}
+          path: weave-backend
+
+      - name: Build backend image for smoke stack
+        run: docker build -t "${WEAVE_BACKEND_IMAGE}" weave-backend
 
       - name: Bootstrap the local stack with a smoke-test user
         env:
