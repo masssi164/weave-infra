@@ -120,8 +120,11 @@ jobs:
           ref: ${{ steps.backend_ref.outputs.ref }}
           path: weave-backend
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build backend image for smoke stack
-        run: docker build -t "${WEAVE_BACKEND_IMAGE}" weave-backend
+        run: docker buildx build --load -t "${WEAVE_BACKEND_IMAGE}" weave-backend
 
       - name: Bootstrap the local stack with a smoke-test user
         env:
