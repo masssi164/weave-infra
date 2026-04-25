@@ -28,6 +28,7 @@ readonly PERSISTED_TF_VARS=(
   TF_VAR_proxy_host_port
   TF_VAR_proxy_http_host_port
   TF_VAR_keycloak_host_port
+  TF_VAR_keycloak_management_host_port
   TF_VAR_mas_host_port
   TF_VAR_synapse_host_port
   TF_VAR_nextcloud_host_port
@@ -291,6 +292,20 @@ terraform_apply() {
   terraform -chdir="${dir}" apply -refresh=false -input=false -auto-approve
 }
 
+ensure_terraform_network_state() {
+  local existing_network_id=""
+
+  if terraform -chdir="${INFRA_DIR}" state show docker_network.weave_network >/dev/null 2>&1; then
+    return
+  fi
+
+  if docker network inspect "${TF_VAR_docker_network_name}" >/dev/null 2>&1; then
+    existing_network_id="$(docker network inspect --format '{{.ID}}' "${TF_VAR_docker_network_name}")"
+    log "Importing existing Docker network ${TF_VAR_docker_network_name} into Terraform state..."
+    terraform -chdir="${INFRA_DIR}" import -input=false docker_network.weave_network "${existing_network_id}"
+  fi
+}
+
 terraform_output_raw() {
   local dir="$1"
   local name="$2"
@@ -329,6 +344,23 @@ refresh_backend_container_if_image_changed() {
   docker rm -f weave-backend >/dev/null
   terraform -chdir="${INFRA_DIR}" init -input=false
   terraform -chdir="${INFRA_DIR}" apply -input=false -auto-approve
+}
+
+ensure_postgres_bootstrap_applied() {
+  local sql_file="${INFRA_DIR}/.generated/db/001-init.sql"
+
+  log "Ensuring PostgreSQL bootstrap state is applied..."
+
+  for attempt in $(seq 1 30); do
+    if docker exec weave-db pg_isready -U "${TF_VAR_db_admin_username}" -d postgres >/dev/null 2>&1; then
+      docker exec -e PGPASSWORD="${TF_VAR_db_admin_password}" -i weave-db \
+        psql -v ON_ERROR_STOP=1 -U "${TF_VAR_db_admin_username}" -d postgres < "${sql_file}"
+      return 0
+    fi
+    sleep 2
+  done
+
+  fail "PostgreSQL bootstrap did not become ready in time for SQL initialization."
 }
 
 public_port_suffix() {
@@ -386,6 +418,40 @@ maybe_prepare_runner_hygiene() {
   WEAVE_REMOVE_VOLUMES="${WEAVE_REMOVE_VOLUMES:-false}" bash "${TEARDOWN_SCRIPT}"
 }
 
+cleanup_partial_weave_containers() {
+  local name
+  local state
+  local removed_any=false
+  local containers=(
+    weave-proxy
+    weave-db
+    weave-keycloak
+    weave-backend
+    weave-mas
+    weave-synapse
+    weave-nextcloud
+  )
+
+  for name in "${containers[@]}"; do
+    if ! docker container inspect "${name}" >/dev/null 2>&1; then
+      continue
+    fi
+
+    state="$(docker inspect --format '{{.State.Status}}' "${name}" 2>/dev/null || true)"
+    case "${state}" in
+      created|dead|exited)
+        log "Removing leftover ${state} container ${name} before bootstrap..."
+        docker rm -f "${name}" >/dev/null
+        removed_any=true
+        ;;
+    esac
+  done
+
+  if [[ "${removed_any}" == true ]]; then
+    log "Removed stale partial Weave containers."
+  fi
+}
+
 ensure_default_inputs() {
   local defaults=(
     "TF_VAR_docker_network_name=weave_network"
@@ -399,6 +465,7 @@ ensure_default_inputs() {
     "TF_VAR_proxy_host_port=44443"
     "TF_VAR_proxy_http_host_port=44080"
     "TF_VAR_keycloak_host_port=48080"
+    "TF_VAR_keycloak_management_host_port=49000"
     "TF_VAR_mas_host_port=48082"
     "TF_VAR_synapse_host_port=48008"
     "TF_VAR_nextcloud_host_port=48083"
@@ -673,17 +740,20 @@ main() {
   load_persisted_env
   ensure_default_inputs
   maybe_prepare_runner_hygiene
+  cleanup_partial_weave_containers
   ensure_docker_provider_inputs
   ensure_generated_secrets
   ensure_local_tls_certificates
   persist_bootstrap_env
+  ensure_terraform_network_state
 
   log "Applying infrastructure module..."
   terraform_apply "${INFRA_DIR}"
+  ensure_postgres_bootstrap_applied
   refresh_backend_container_if_image_changed
 
-  log "Waiting for Keycloak readiness..."
-  wait_for_http_200 "Keycloak" "http://${LOOPBACK_HOST}:${TF_VAR_keycloak_host_port}/health/ready"
+  log "Waiting for Keycloak management readiness..."
+  wait_for_http_200 "Keycloak management" "http://${LOOPBACK_HOST}:${TF_VAR_keycloak_management_host_port}/health/ready"
 
   log "Waiting for Keycloak admin login readiness..."
   wait_for_keycloak_admin_login 90 2

@@ -7,7 +7,8 @@ terraform {
 }
 
 resource "docker_image" "this" {
-  name = var.image_name
+  name         = var.image_name
+  keep_locally = true
 }
 
 resource "docker_volume" "data" {
@@ -19,6 +20,10 @@ resource "docker_container" "this" {
   image   = docker_image.this.image_id
   command = ["start-dev"]
   restart = "unless-stopped"
+  depends_on = [
+    docker_image.this,
+    docker_volume.data,
+  ]
   env = [
     "KC_BOOTSTRAP_ADMIN_USERNAME=${var.admin_username}",
     "KC_BOOTSTRAP_ADMIN_PASSWORD=${var.admin_password}",
@@ -32,13 +37,18 @@ resource "docker_container" "this" {
     "KC_HOSTNAME=${var.public_url}",
     "KC_HTTP_ENABLED=true",
     "KC_HEALTH_ENABLED=true",
-    "KC_HTTP_MANAGEMENT_HEALTH_ENABLED=false",
+    "KC_HTTP_MANAGEMENT_PORT=9000",
     "KC_PROXY_HEADERS=xforwarded",
   ]
 
   ports {
     internal = 8080
     external = var.host_port
+  }
+
+  ports {
+    internal = 9000
+    external = var.management_host_port
   }
 
   volumes {

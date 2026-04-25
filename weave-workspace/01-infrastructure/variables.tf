@@ -80,9 +80,15 @@ variable "proxy_http_host_port" {
 }
 
 variable "keycloak_host_port" {
-  description = "Direct host port for Keycloak bootstrap access."
+  description = "Direct host port for Keycloak application HTTP and bootstrap login access."
   type        = number
   default     = 8080
+}
+
+variable "keycloak_management_host_port" {
+  description = "Direct host port for Keycloak management HTTP health endpoints."
+  type        = number
+  default     = 9000
 }
 
 variable "mas_host_port" {

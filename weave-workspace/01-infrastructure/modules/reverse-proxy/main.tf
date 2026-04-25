@@ -23,6 +23,11 @@ resource "docker_container" "this" {
   name    = var.container_name
   image   = docker_image.this.image_id
   restart = "unless-stopped"
+  depends_on = [
+    docker_image.this,
+    docker_volume.data,
+    docker_volume.config,
+  ]
 
   ports {
     internal = 80

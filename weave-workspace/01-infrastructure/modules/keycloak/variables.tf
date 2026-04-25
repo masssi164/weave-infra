@@ -19,7 +19,12 @@ variable "volume_name" {
 }
 
 variable "host_port" {
-  description = "Direct host port exposed by Keycloak."
+  description = "Direct host port exposed by Keycloak application HTTP."
+  type        = number
+}
+
+variable "management_host_port" {
+  description = "Direct host port exposed by Keycloak management HTTP for health and metrics."
   type        = number
 }
 

@@ -7,7 +7,8 @@ terraform {
 }
 
 resource "docker_image" "this" {
-  name = var.image_name
+  name         = var.image_name
+  keep_locally = true
 }
 
 resource "docker_volume" "data" {
@@ -18,6 +19,10 @@ resource "docker_container" "this" {
   name    = var.container_name
   image   = docker_image.this.image_id
   restart = "unless-stopped"
+  depends_on = [
+    docker_image.this,
+    docker_volume.data,
+  ]
   env = [
     "POSTGRES_DB=${var.database_name}",
     "POSTGRES_USER=${var.admin_username}",

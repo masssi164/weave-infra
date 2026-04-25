@@ -96,8 +96,10 @@ main() {
 
   load_bootstrap_env
 
-  terraform_destroy "${KEYCLOAK_DIR}"
-  terraform_destroy "${INFRA_DIR}"
+  if [[ "${WEAVE_TERRAFORM_DESTROY:-false}" == "true" ]]; then
+    terraform_destroy "${KEYCLOAK_DIR}"
+    terraform_destroy "${INFRA_DIR}"
+  fi
 
   local container
   for container in "${WEAVE_CONTAINERS[@]}"; do
