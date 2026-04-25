@@ -123,6 +123,21 @@ curl_auth_json() {
     "$url"
 }
 
+curl_nextcloud_bearer_json() {
+  local token="$1"
+  local url="$2"
+  local host_port
+
+  host_port="$(host_port_from_url "${url}")"
+  curl --silent --show-error --fail \
+    --cacert "${CADDY_TLS_CA_FILE}" \
+    --resolve "${host_port}:127.0.0.1" \
+    -H "Authorization: Bearer ${token}" \
+    -H 'OCS-APIREQUEST: true' \
+    -H 'Accept: application/json' \
+    "$url"
+}
+
 curl_status() {
   local url="$1"
   local host_port
@@ -190,7 +205,9 @@ token_response="$(curl_form "${token_endpoint}" \
   --data-urlencode password="${WEAVE_TEST_PASSWORD}" \
   --data-urlencode scope='openid profile email weave:workspace')"
 access_token="$(jq -r '.access_token' <<<"${token_response}")"
+id_token="$(jq -r '.id_token' <<<"${token_response}")"
 [[ -n "${access_token}" && "${access_token}" != "null" ]] || fail "Smoke check failed: Keycloak did not return an access token"
+[[ -n "${id_token}" && "${id_token}" != "null" ]] || fail "Smoke check failed: Keycloak did not return an ID token"
 
 log "Checking authenticated backend contract..."
 profile_response="$(curl_auth_json "${access_token}" "${WEAVE_BASE_URL}/api/v1/me")"
@@ -208,8 +225,16 @@ assert_json "${nextcloud_providers}" ".identifier == \"keycloak\"" "Nextcloud sh
 assert_json "${nextcloud_providers}" ".clientId == \"nextcloud\"" "Nextcloud provider client ID should stay aligned"
 assert_json "${nextcloud_providers}" ".discoveryEndpoint == \"${WEAVE_OIDC_ISSUER_URL}/.well-known/openid-configuration\"" "Nextcloud should point at the public Keycloak discovery URL"
 assert_json "${nextcloud_providers}" '.settings.groupProvisioning == true' "Nextcloud group provisioning should remain enabled"
+assert_json "${nextcloud_providers}" '.settings.checkBearer == true' "Nextcloud should accept bearer-token API/WebDAV auth"
+assert_json "${nextcloud_providers}" '.settings.bearerProvisioning == true' "Nextcloud should provision users from bearer-token API/WebDAV auth"
+nextcloud_user_oidc_config="$(docker exec --user www-data "${NEXTCLOUD_CONTAINER_NAME}" php occ config:system:get user_oidc --output=json)"
+assert_json "${nextcloud_user_oidc_config}" '.selfencoded_bearer_validation_audience_check == false' "Nextcloud should accept the local weave-app token audience for bearer validation"
+assert_json "${nextcloud_user_oidc_config}" '.userinfo_bearer_validation == true' "Nextcloud should enable userinfo bearer validation"
 nextcloud_oidc_redirect="$(curl_location "$(public_url "${TF_VAR_nextcloud_subdomain:-nextcloud}")/apps/user_oidc/login/1")"
 [[ "${nextcloud_oidc_redirect}" == https://keycloak* ]] || fail "Smoke check failed: Nextcloud OIDC login should redirect to Keycloak, got '${nextcloud_oidc_redirect}'"
+nextcloud_bearer_user="$(curl_nextcloud_bearer_json "${id_token}" "$(public_url "${TF_VAR_nextcloud_subdomain:-nextcloud}")/ocs/v2.php/cloud/user?format=json")"
+assert_json "${nextcloud_bearer_user}" '.ocs.meta.statuscode == 200' "Nextcloud should accept the Weave app ID token for API auth"
+assert_json "${nextcloud_bearer_user}" '.ocs.data.id | length > 0' "Nextcloud bearer API auth should resolve a user id"
 
 log "Checking Matrix auth routing and MAS wiring..."
 matrix_base_url="$(public_url "${TF_VAR_matrix_subdomain:-matrix}")"
@@ -219,6 +244,15 @@ assert_json "${matrix_login}" '.flows | any(."org.matrix.msc3824.delegated_oidc_
 mas_discovery="$(curl_json "${matrix_base_url}/.well-known/openid-configuration")"
 assert_json "${mas_discovery}" ".issuer == \"${matrix_base_url}/\"" "MAS issuer should match the public matrix URL"
 assert_json "${mas_discovery}" ".authorization_endpoint | contains(\"/authorize\")" "MAS discovery should expose an authorization endpoint"
+
+matrix_client_well_known="$(curl_json "${matrix_base_url}/.well-known/matrix/client")"
+assert_json "${matrix_client_well_known}" ".\"org.matrix.msc2965.authentication\".issuer == \"${matrix_base_url}/\"" "Matrix client well-known should advertise MAS auth delegation"
+
+mas_synapse_status="$(curl --silent --show-error -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer ${TF_VAR_mas_matrix_secret:?Expected TF_VAR_mas_matrix_secret in env or bootstrap env}" \
+  "http://127.0.0.1:${TF_VAR_synapse_host_port:-48008}/_synapse/mas/is_localpart_available?localpart=weave_smoke_probe" || true)"
+[[ "${mas_synapse_status}" == "200" ]] || fail "Smoke check failed: MAS shared secret was rejected by Synapse MAS endpoints with HTTP ${mas_synapse_status}"
+
 authorize_status="$(curl_status "${matrix_base_url}/authorize")"
 [[ "${authorize_status}" == "400" ]] || fail "Smoke check failed: MAS authorize endpoint should be reachable and reject incomplete requests with 400"
 

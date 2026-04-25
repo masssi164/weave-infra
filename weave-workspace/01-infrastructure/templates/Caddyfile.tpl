@@ -20,8 +20,14 @@ ${matrix_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
+	@matrix_auth_metadata path /_matrix/client/*/auth_metadata
 	@matrix_auth path_regexp matrix_auth ^/_matrix/client/.*/(login|logout|refresh)$
 	@synapse path /_matrix/* /_synapse/client/* /_synapse/mas/* /.well-known/matrix/*
+
+	handle @matrix_auth_metadata {
+		rewrite * /.well-known/openid-configuration
+		reverse_proxy ${mas_upstream}
+	}
 
 	handle @matrix_auth {
 		reverse_proxy ${mas_upstream}

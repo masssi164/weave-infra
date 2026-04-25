@@ -688,11 +688,19 @@ configure_nextcloud_oidc() {
   # Nextcloud blocks RFC1918 / local-address targets by default, which breaks discovery in local dev.
   occ config:system:set allow_local_remote_servers --type=bool --value=true
   occ config:app:set --type=boolean --value="${allow_insecure_http}" user_oidc allow_insecure_http
+  # The Weave app signs in with the browser-grade weave-app OIDC client and then reuses
+  # that session token for API/WebDAV access. Nextcloud therefore must validate bearer
+  # tokens from the configured provider and allow the local app audience instead of
+  # falling back to its interactive login/v2 app-password flow during E2E.
+  occ config:system:set user_oidc selfencoded_bearer_validation_audience_check --type=boolean --value=false
+  occ config:system:set user_oidc userinfo_bearer_validation --type=boolean --value=true
   occ user_oidc:provider keycloak \
     --clientid="${nextcloud_client_id}" \
     --clientsecret="${nextcloud_client_secret}" \
     --discoveryuri="${issuer_url}/.well-known/openid-configuration" \
-    --group-provisioning=1
+    --group-provisioning=1 \
+    --check-bearer=1 \
+    --bearer-provisioning=1
 }
 
 print_summary() {

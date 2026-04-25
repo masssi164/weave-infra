@@ -125,8 +125,22 @@ assert_json "${backend_health}" '.status == "UP"' "public backend health should 
 
 nextcloud_status="$(curl_json "${WEAVE_NEXTCLOUD_URL}/status.php")"
 assert_json "${nextcloud_status}" '.installed == true' "Nextcloud should be installed"
+nextcloud_providers="$(docker exec --user www-data weave-nextcloud php occ user_oidc:providers)"
+assert_json "${nextcloud_providers}" '.settings.checkBearer == true' "Nextcloud should accept bearer-token API/WebDAV auth"
+assert_json "${nextcloud_providers}" '.settings.bearerProvisioning == true' "Nextcloud should provision users from bearer-token API/WebDAV auth"
+nextcloud_user_oidc_config="$(docker exec --user www-data weave-nextcloud php occ config:system:get user_oidc --output=json)"
+assert_json "${nextcloud_user_oidc_config}" '.selfencoded_bearer_validation_audience_check == false' "Nextcloud should accept the local weave-app token audience for bearer validation"
+assert_json "${nextcloud_user_oidc_config}" '.userinfo_bearer_validation == true' "Nextcloud should enable userinfo bearer validation"
 
 mas_discovery="$(curl_json "${WEAVE_MATRIX_URL}/.well-known/openid-configuration")"
 assert_json "${mas_discovery}" ".issuer == \"${WEAVE_MATRIX_URL}/\"" "MAS issuer should match the public matrix URL"
+
+matrix_client_well_known="$(curl_json "${WEAVE_MATRIX_URL}/.well-known/matrix/client")"
+assert_json "${matrix_client_well_known}" ".\"org.matrix.msc2965.authentication\".issuer == \"${WEAVE_MATRIX_URL}/\"" "Matrix client well-known should advertise MAS auth delegation"
+
+mas_synapse_status="$(curl --silent --show-error -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer ${TF_VAR_mas_matrix_secret:?Expected TF_VAR_mas_matrix_secret in env or bootstrap env}" \
+  "http://127.0.0.1:${TF_VAR_synapse_host_port:-48008}/_synapse/mas/is_localpart_available?localpart=weave_readiness_probe" || true)"
+[[ "${mas_synapse_status}" == "200" ]] || fail "Operator check failed: MAS shared secret was rejected by Synapse MAS endpoints with HTTP ${mas_synapse_status}"
 
 log "Operator checks passed."
