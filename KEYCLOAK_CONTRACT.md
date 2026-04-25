@@ -56,10 +56,10 @@ export WEAVE_OIDC_CLIENT_ID=weave-app
 - PKCE: required, `S256`
 - Sign-in redirect URI: `com.massimotter.weave:/oauthredirect`
 - Post-logout redirect URI: `com.massimotter.weave:/logout`
-- Optional API scope: `weave:workspace`
+- Default API scope: `weave:workspace`
 - Resource Owner Password Grant: disabled by default, enabled only when `create_test_user=true`
 
-The Flutter app must request `openid profile email weave:workspace` when it needs API tokens for the backend.
+The Flutter app may request `openid profile email`; `weave:workspace` is assigned as a default app scope so backend-bound access tokens include it.
 
 ### Weave Backend
 
@@ -110,7 +110,7 @@ The scope carries an audience mapper:
 
 ## Token Claims
 
-A mobile access token requested with `weave:workspace` must include:
+A mobile access token for `weave-app` must include:
 
 - `iss`: `https://auth.weave.local/realms/weave`
 - `azp`: `weave-app`

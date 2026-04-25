@@ -197,7 +197,7 @@ token_response="$(curl_form "${token_endpoint}" \
   --data-urlencode client_id="${WEAVE_OIDC_CLIENT_ID}" \
   --data-urlencode username="${WEAVE_TEST_USERNAME}" \
   --data-urlencode password="${WEAVE_TEST_PASSWORD}" \
-  --data-urlencode scope='openid profile email weave:workspace')"
+  --data-urlencode scope='openid profile email')"
 access_token="$(jq -r '.access_token' <<<"${token_response}")"
 [[ -n "${access_token}" && "${access_token}" != "null" ]] || fail "Smoke check failed: Keycloak did not return an access token"
 

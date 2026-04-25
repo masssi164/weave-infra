@@ -23,6 +23,12 @@ locals {
   ]
 
   weave_app_default_scopes = [
+    "acr",
+    "basic",
+    "email",
+    "profile",
+    "roles",
+    "web-origins",
     "weave:workspace",
   ]
 

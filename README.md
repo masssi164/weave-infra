@@ -215,7 +215,7 @@ The default Keycloak client contract for the Weave mobile app is:
 - OIDC client ID: `weave-app`
 - sign-in redirect URI: `com.massimotter.weave:/oauthredirect`
 - post-logout redirect URI: `com.massimotter.weave:/logout`
-- optional API scope: `weave:workspace`
+- default API scope: `weave:workspace`
 - Resource Owner Password Grant: disabled by default, enabled only when `TF_VAR_create_test_user=true`
 
 The backend resource server contract is:
