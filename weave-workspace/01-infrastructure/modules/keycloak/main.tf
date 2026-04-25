@@ -20,8 +20,8 @@ resource "docker_container" "this" {
   command = ["start-dev"]
   restart = "unless-stopped"
   env = [
-    "KEYCLOAK_ADMIN=${var.admin_username}",
-    "KEYCLOAK_ADMIN_PASSWORD=${var.admin_password}",
+    "KC_BOOTSTRAP_ADMIN_USERNAME=${var.admin_username}",
+    "KC_BOOTSTRAP_ADMIN_PASSWORD=${var.admin_password}",
     "KC_DB=postgres",
     "KC_DB_URL_HOST=${var.db_host}",
     "KC_DB_URL_PORT=${var.db_port}",

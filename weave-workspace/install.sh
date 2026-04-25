@@ -214,6 +214,7 @@ persist_bootstrap_env() {
 
 ensure_mas_signing_key() {
   if [[ -n "${TF_VAR_mas_signing_key_pem:-}" ]]; then
+    export TF_VAR_mas_signing_key_pem
     return
   fi
 
@@ -221,8 +222,8 @@ ensure_mas_signing_key() {
   key_file="$(mktemp)"
 
   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "${key_file}" >/dev/null 2>&1
-  export TF_VAR_mas_signing_key_pem
   TF_VAR_mas_signing_key_pem="$(<"${key_file}")"
+  export TF_VAR_mas_signing_key_pem
   rm -f -- "${key_file}"
 }
 
@@ -435,6 +436,7 @@ ensure_generated_secrets() {
     set_default_secret TF_VAR_test_user_password "$(random_base64 16)"
   fi
   ensure_mas_signing_key
+  export TF_VAR_mas_signing_key_pem
 }
 
 certificate_alt_names() {
@@ -692,4 +694,6 @@ main() {
   print_summary
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
