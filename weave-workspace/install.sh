@@ -245,6 +245,23 @@ wait_for_http_200() {
   fail "${name} never became ready at ${url}"
 }
 
+wait_for_keycloak_admin_login() {
+  local attempts="${1:-60}"
+  local sleep_seconds="${2:-2}"
+  local token_url="http://${LOOPBACK_HOST}:${TF_VAR_keycloak_host_port}/realms/master/protocol/openid-connect/token"
+  local response
+
+  for ((i = 1; i <= attempts; i++)); do
+    response="$(curl -sS -X POST "${token_url}"       -H 'Content-Type: application/x-www-form-urlencoded'       --data-urlencode 'client_id=admin-cli'       --data-urlencode "username=${TF_VAR_keycloak_admin_username}"       --data-urlencode "password=${TF_VAR_keycloak_admin_password}"       --data-urlencode 'grant_type=password' || true)"
+    if [[ "${response}" == *'"access_token"'* ]]; then
+      return 0
+    fi
+    sleep "${sleep_seconds}"
+  done
+
+  fail "Keycloak admin login never became ready at ${token_url} for user ${TF_VAR_keycloak_admin_username}"
+}
+
 wait_for_nextcloud() {
   local attempts="${1:-120}"
   local sleep_seconds="${2:-5}"
@@ -667,6 +684,9 @@ main() {
 
   log "Waiting for Keycloak readiness..."
   wait_for_http_200 "Keycloak" "http://${LOOPBACK_HOST}:${TF_VAR_keycloak_host_port}/health/ready"
+
+  log "Waiting for Keycloak admin login readiness..."
+  wait_for_keycloak_admin_login 90 2
 
   log "Applying Keycloak configuration module..."
   terraform_apply "${KEYCLOAK_DIR}"
