@@ -80,9 +80,15 @@ variable "proxy_http_host_port" {
 }
 
 variable "keycloak_host_port" {
-  description = "Direct host port for Keycloak bootstrap access."
+  description = "Direct host port for Keycloak application HTTP and bootstrap login access."
   type        = number
   default     = 8080
+}
+
+variable "keycloak_management_host_port" {
+  description = "Direct host port for Keycloak management HTTP health endpoints."
+  type        = number
+  default     = 9000
 }
 
 variable "mas_host_port" {
@@ -178,19 +184,19 @@ variable "postgres_image" {
 variable "keycloak_image" {
   description = "Keycloak image used for identity management."
   type        = string
-  default     = "quay.io/keycloak/keycloak:latest"
+  default     = "quay.io/keycloak/keycloak:26.0.7"
 }
 
 variable "mas_image" {
   description = "Matrix Authentication Service image."
   type        = string
-  default     = "ghcr.io/element-hq/matrix-authentication-service:latest"
+  default     = "ghcr.io/element-hq/matrix-authentication-service:0.14.0"
 }
 
 variable "synapse_image" {
   description = "Synapse image."
   type        = string
-  default     = "matrixdotorg/synapse:latest"
+  default     = "matrixdotorg/synapse:v1.127.1"
 }
 
 variable "nextcloud_image" {

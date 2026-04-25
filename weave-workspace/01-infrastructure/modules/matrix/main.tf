@@ -7,11 +7,13 @@ terraform {
 }
 
 resource "docker_image" "mas" {
-  name = var.mas_image_name
+  name         = var.mas_image_name
+  keep_locally = true
 }
 
 resource "docker_image" "synapse" {
-  name = var.synapse_image_name
+  name         = var.synapse_image_name
+  keep_locally = true
 }
 
 resource "docker_volume" "synapse_data" {
@@ -24,20 +26,22 @@ resource "terraform_data" "synapse_volume_permissions" {
     var.synapse_image_name,
     var.synapse_uid,
     var.synapse_gid,
+    var.matrix_public_host,
   ]
 
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     environment = {
-      SYNAPSE_VOLUME = docker_volume.synapse_data.name
-      SYNAPSE_UID    = tostring(var.synapse_uid)
-      SYNAPSE_GID    = tostring(var.synapse_gid)
+      SYNAPSE_VOLUME      = docker_volume.synapse_data.name
+      SYNAPSE_UID         = tostring(var.synapse_uid)
+      SYNAPSE_GID         = tostring(var.synapse_gid)
+      SYNAPSE_SIGNING_KEY = "/data/${var.matrix_public_host}.signing.key"
     }
     command = <<-EOT
       set -euo pipefail
 
       docker run --rm -u 0:0 -v "$${SYNAPSE_VOLUME}:/data" --entrypoint /bin/sh "${var.synapse_image_name}" -c \
-        "install -d -m 0750 -o $${SYNAPSE_UID} -g $${SYNAPSE_GID} /data /data/media_store && chown -R $${SYNAPSE_UID}:$${SYNAPSE_GID} /data"
+        "install -d -m 0750 -o $${SYNAPSE_UID} -g $${SYNAPSE_GID} /data /data/media_store && rm -f \"$${SYNAPSE_SIGNING_KEY}\" && chown -R $${SYNAPSE_UID}:$${SYNAPSE_GID} /data"
     EOT
   }
 
@@ -52,6 +56,9 @@ resource "docker_container" "mas" {
   image   = docker_image.mas.image_id
   restart = "unless-stopped"
   command = ["server", "-c", "/config/config.yaml"]
+  depends_on = [
+    docker_image.mas,
+  ]
   env = [
     "SSL_CERT_FILE=/certs/${var.tls_ca_filename}",
     "CURL_CA_BUNDLE=/certs/${var.tls_ca_filename}",
@@ -122,6 +129,7 @@ resource "docker_container" "synapse" {
   name    = var.synapse_container_name
   image   = docker_image.synapse.image_id
   restart = "unless-stopped"
+  user    = "${var.synapse_uid}:${var.synapse_gid}"
   env = [
     "SYNAPSE_CONFIG_PATH=/config/homeserver.yaml",
     "SYNAPSE_SERVER_NAME=${var.matrix_public_host}",
@@ -187,7 +195,6 @@ resource "docker_container" "synapse" {
       storage_opts,
       sysctls,
       tmpfs,
-      user,
       working_dir,
     ]
   }

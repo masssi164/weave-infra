@@ -18,13 +18,17 @@ locals {
 }
 
 resource "docker_image" "this" {
-  name = var.image_name
+  name         = var.image_name
+  keep_locally = true
 }
 
 resource "docker_container" "this" {
   name    = var.container_name
   image   = docker_image.this.image_id
   restart = "unless-stopped"
+  depends_on = [
+    docker_image.this,
+  ]
   env = [
     "WEAVE_OIDC_ISSUER_URI=${var.oidc_issuer_uri}",
     "WEAVE_OIDC_JWK_SET_URI=${var.oidc_jwk_set_uri}",

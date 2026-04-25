@@ -202,6 +202,21 @@ resource "docker_network" "weave_network" {
   name = var.docker_network_name
 }
 
+resource "terraform_data" "network_ready" {
+  triggers_replace = [docker_network.weave_network.id]
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      WEAVE_NETWORK_NAME = docker_network.weave_network.name
+    }
+    command = <<-EOT
+      set -euo pipefail
+      docker network inspect "$${WEAVE_NETWORK_NAME}" >/dev/null
+    EOT
+  }
+}
+
 resource "local_sensitive_file" "generated" {
   for_each = local.generated_files
 
@@ -226,6 +241,7 @@ module "postgres" {
   database_name  = "postgres"
   admin_username = var.db_admin_username
   admin_password = var.db_admin_password
+  depends_on     = [terraform_data.network_ready]
 }
 
 resource "terraform_data" "postgres_bootstrap" {
@@ -282,26 +298,28 @@ module "reverse_proxy" {
   data_volume_name   = "weave_caddy_data"
   config_volume_name = "weave_caddy_config"
   public_hosts       = local.public_hosts
+  depends_on         = [terraform_data.network_ready, local_file.caddyfile]
 }
 
 module "keycloak" {
   source = "./modules/keycloak"
 
-  network_name   = docker_network.weave_network.name
-  container_name = local.service_names.keycloak
-  image_name     = var.keycloak_image
-  volume_name    = "weave_keycloak_data"
-  host_port      = var.keycloak_host_port
-  public_url     = local.public_urls.keycloak
-  db_host        = module.postgres.container_name
-  db_port        = 5432
-  db_name        = local.service_databases.keycloak.database_name
-  db_schema      = "public"
-  db_username    = var.keycloak_db_username
-  db_password    = var.keycloak_db_password
-  admin_username = var.keycloak_admin_username
-  admin_password = var.keycloak_admin_password
-  depends_on     = [terraform_data.postgres_bootstrap]
+  network_name         = docker_network.weave_network.name
+  container_name       = local.service_names.keycloak
+  image_name           = var.keycloak_image
+  volume_name          = "weave_keycloak_data"
+  host_port            = var.keycloak_host_port
+  management_host_port = var.keycloak_management_host_port
+  public_url           = local.public_urls.keycloak
+  db_host              = module.postgres.container_name
+  db_port              = 5432
+  db_name              = local.service_databases.keycloak.database_name
+  db_schema            = "public"
+  db_username          = var.keycloak_db_username
+  db_password          = var.keycloak_db_password
+  admin_username       = var.keycloak_admin_username
+  admin_password       = var.keycloak_admin_password
+  depends_on           = [terraform_data.network_ready, terraform_data.postgres_bootstrap]
 }
 
 module "backend" {
@@ -318,7 +336,7 @@ module "backend" {
   oidc_required_audience = local.weave_backend_audience
   client_id              = local.weave_app_client_id
   healthcheck_path       = "/actuator/health"
-  depends_on             = [module.keycloak]
+  depends_on             = [terraform_data.network_ready, module.keycloak]
 }
 
 module "matrix" {
@@ -343,7 +361,7 @@ module "matrix" {
   tls_ca_filename        = basename(local.caddy_tls_ca_file)
   synapse_uid            = var.synapse_uid
   synapse_gid            = var.synapse_gid
-  depends_on             = [terraform_data.postgres_bootstrap, module.keycloak]
+  depends_on             = [terraform_data.network_ready, terraform_data.postgres_bootstrap, module.keycloak]
 }
 
 module "nextcloud" {
@@ -366,7 +384,7 @@ module "nextcloud" {
   db_password        = var.nextcloud_db_password
   admin_username     = var.nextcloud_admin_username
   admin_password     = var.nextcloud_admin_password
-  depends_on         = [terraform_data.postgres_bootstrap]
+  depends_on         = [terraform_data.network_ready, terraform_data.postgres_bootstrap]
 }
 
 moved {

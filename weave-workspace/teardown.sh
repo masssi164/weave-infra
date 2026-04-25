@@ -8,6 +8,7 @@ readonly ROOT_DIR
 readonly INFRA_DIR="${ROOT_DIR}/01-infrastructure"
 readonly KEYCLOAK_DIR="${ROOT_DIR}/02-keycloak-setup"
 readonly BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
+readonly RUNNER_BOOTSTRAP_ENV_FILE="/tmp/weave-infra/weave-workspace/.generated/bootstrap.env"
 readonly WEAVE_CONTAINERS=(
   weave-proxy
   weave-keycloak
@@ -68,6 +69,21 @@ remove_network() {
   fi
 }
 
+load_bootstrap_env() {
+  local env_file=""
+
+  if [[ -f "${BOOTSTRAP_ENV_FILE}" ]]; then
+    env_file="${BOOTSTRAP_ENV_FILE}"
+  elif [[ -f "${RUNNER_BOOTSTRAP_ENV_FILE}" ]]; then
+    env_file="${RUNNER_BOOTSTRAP_ENV_FILE}"
+  fi
+
+  if [[ -n "${env_file}" ]]; then
+    # shellcheck disable=SC1090
+    source "${env_file}"
+  fi
+}
+
 main() {
   command -v docker >/dev/null 2>&1 || {
     printf 'Missing required command: docker\n' >&2
@@ -78,13 +94,12 @@ main() {
     exit 1
   }
 
-  if [[ -f "${BOOTSTRAP_ENV_FILE}" ]]; then
-    # shellcheck disable=SC1090
-    source "${BOOTSTRAP_ENV_FILE}"
-  fi
+  load_bootstrap_env
 
-  terraform_destroy "${KEYCLOAK_DIR}"
-  terraform_destroy "${INFRA_DIR}"
+  if [[ "${WEAVE_TERRAFORM_DESTROY:-false}" == "true" ]]; then
+    terraform_destroy "${KEYCLOAK_DIR}"
+    terraform_destroy "${INFRA_DIR}"
+  fi
 
   local container
   for container in "${WEAVE_CONTAINERS[@]}"; do
