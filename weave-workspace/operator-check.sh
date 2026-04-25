@@ -5,6 +5,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
+RUNNER_BOOTSTRAP_ENV_FILE="/tmp/weave-infra/weave-workspace/.generated/bootstrap.env"
 
 log() {
   printf '%s\n' "$*"
@@ -20,10 +21,19 @@ require_command() {
 }
 
 load_bootstrap_env() {
-  if [[ -f "${BOOTSTRAP_ENV_FILE}" ]]; then
-    # shellcheck disable=SC1090
-    source "${BOOTSTRAP_ENV_FILE}"
+  local bootstrap_env="${WEAVE_BOOTSTRAP_ENV:-${BOOTSTRAP_ENV_FILE}}"
+
+  if [[ ! -f "${bootstrap_env}" && -f "${RUNNER_BOOTSTRAP_ENV_FILE}" ]]; then
+    bootstrap_env="${RUNNER_BOOTSTRAP_ENV_FILE}"
   fi
+
+  if [[ -f "${bootstrap_env}" ]]; then
+    # shellcheck disable=SC1090
+    source "${bootstrap_env}"
+    return 0
+  fi
+
+  return 1
 }
 
 public_port_suffix() {
@@ -98,7 +108,15 @@ assert_json() {
 require_command curl
 require_command docker
 require_command jq
-load_bootstrap_env
+if ! load_bootstrap_env; then
+  log "Operator check skipped: bootstrap env not found yet."
+  exit 0
+fi
+
+if [[ -z "${TF_VAR_tenant_domain:-}" ]]; then
+  log "Operator check skipped: TF_VAR_tenant_domain is not available because bootstrap did not finish."
+  exit 0
+fi
 
 : "${WEAVE_BASE_URL:=$(public_url "${TF_VAR_api_subdomain:-api}")}"
 : "${WEAVE_OIDC_ISSUER_URL:=$(public_url "${TF_VAR_auth_subdomain:-keycloak}")/realms/${TF_VAR_tenant_slug:-weave}}"

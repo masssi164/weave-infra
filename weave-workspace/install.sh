@@ -207,33 +207,40 @@ resolve_backend_image_ref() {
 
 persist_bootstrap_env() {
   local var
+  local bootstrap_env_tmp
+  local runner_bootstrap_env_tmp
+  local bootstrap_status="${1:-ready}"
 
   mkdir -p "$(dirname -- "${BOOTSTRAP_ENV_FILE}")" "$(dirname -- "${RUNNER_BOOTSTRAP_ENV_FILE}")"
-  : > "${BOOTSTRAP_ENV_FILE}"
-  chmod 600 "${BOOTSTRAP_ENV_FILE}"
+  bootstrap_env_tmp="$(mktemp "${BOOTSTRAP_ENV_FILE}.XXXXXX")"
+  runner_bootstrap_env_tmp="$(mktemp "${RUNNER_BOOTSTRAP_ENV_FILE}.XXXXXX")"
+  chmod 600 "${bootstrap_env_tmp}" "${runner_bootstrap_env_tmp}"
+
+  printf 'export WEAVE_BOOTSTRAP_STATUS=%q\n' "${bootstrap_status}" >> "${bootstrap_env_tmp}"
 
   for var in "${PERSISTED_TF_VARS[@]}"; do
     if [[ "${!var+x}" == "x" ]]; then
-      printf 'export %s=%q\n' "${var}" "${!var}" >> "${BOOTSTRAP_ENV_FILE}"
+      printf 'export %s=%q\n' "${var}" "${!var}" >> "${bootstrap_env_tmp}"
     fi
   done
 
   {
     printf 'export WEAVE_BACKEND_IMAGE=%q\n' "${TF_VAR_weave_backend_image}"
-  } >> "${BOOTSTRAP_ENV_FILE}"
+  } >> "${bootstrap_env_tmp}"
 
-  if create_test_user_enabled; then
+  if [[ "${bootstrap_status}" == "ready" ]] && create_test_user_enabled; then
     {
       printf 'export WEAVE_BASE_URL=%q\n' "$(integration_test_base_url)"
       printf 'export WEAVE_OIDC_ISSUER_URL=%q\n' "$(integration_test_oidc_issuer_url)"
       printf 'export WEAVE_OIDC_CLIENT_ID=%q\n' "weave-app"
       printf 'export WEAVE_TEST_USERNAME=%q\n' "${TEST_USER_EMAIL}"
       printf 'export WEAVE_TEST_PASSWORD=%q\n' "${TF_VAR_test_user_password}"
-    } >> "${BOOTSTRAP_ENV_FILE}"
+    } >> "${bootstrap_env_tmp}"
   fi
 
-  cp "${BOOTSTRAP_ENV_FILE}" "${RUNNER_BOOTSTRAP_ENV_FILE}"
-  chmod 600 "${RUNNER_BOOTSTRAP_ENV_FILE}"
+  cp "${bootstrap_env_tmp}" "${runner_bootstrap_env_tmp}"
+  mv -f "${bootstrap_env_tmp}" "${BOOTSTRAP_ENV_FILE}"
+  mv -f "${runner_bootstrap_env_tmp}" "${RUNNER_BOOTSTRAP_ENV_FILE}"
 }
 
 ensure_mas_signing_key() {
@@ -717,7 +724,7 @@ main() {
   ensure_generated_secrets
   ensure_local_tls_certificates
   resolve_backend_image_ref
-  persist_bootstrap_env
+  persist_bootstrap_env pending
 
   log "Applying infrastructure module..."
   terraform_apply "${INFRA_DIR}"
@@ -749,6 +756,7 @@ main() {
   log "Configuring Nextcloud OIDC provider..."
   configure_nextcloud_oidc
 
+  persist_bootstrap_env ready
   print_summary
 }
 

@@ -8,6 +8,7 @@ readonly ROOT_DIR
 readonly INFRA_DIR="${ROOT_DIR}/01-infrastructure"
 readonly KEYCLOAK_DIR="${ROOT_DIR}/02-keycloak-setup"
 readonly BOOTSTRAP_ENV_FILE="${ROOT_DIR}/.generated/bootstrap.env"
+readonly RUNNER_BOOTSTRAP_ENV_FILE="/tmp/weave-infra/weave-workspace/.generated/bootstrap.env"
 readonly WEAVE_CONTAINERS=(
   weave-proxy
   weave-keycloak
@@ -37,8 +38,19 @@ terraform_destroy() {
     return
   fi
 
-  terraform -chdir="${dir}" init -input=false >/dev/null 2>&1 || true
-  terraform -chdir="${dir}" destroy -refresh=false -input=false -auto-approve || true
+  if [[ ! -d "${dir}/.terraform" ]] && [[ ! -f "${dir}/.terraform.lock.hcl" ]]; then
+    log "Skipping terraform destroy in ${dir}: module was never initialized on this runner."
+    return
+  fi
+
+  if ! terraform -chdir="${dir}" init -input=false >/dev/null 2>&1; then
+    log "Skipping terraform destroy in ${dir}: terraform init could not recover a usable working directory."
+    return
+  fi
+
+  if ! terraform -chdir="${dir}" destroy -refresh=false -input=false -auto-approve; then
+    log "Terraform destroy in ${dir} did not complete cleanly, continuing with container/network cleanup."
+  fi
 }
 
 remove_container() {
@@ -78,13 +90,26 @@ main() {
     exit 1
   }
 
-  if [[ -f "${BOOTSTRAP_ENV_FILE}" ]]; then
-    # shellcheck disable=SC1090
-    source "${BOOTSTRAP_ENV_FILE}"
+  local bootstrap_env="${WEAVE_BOOTSTRAP_ENV:-${BOOTSTRAP_ENV_FILE}}"
+  if [[ ! -f "${bootstrap_env}" && -f "${RUNNER_BOOTSTRAP_ENV_FILE}" ]]; then
+    bootstrap_env="${RUNNER_BOOTSTRAP_ENV_FILE}"
   fi
 
-  terraform_destroy "${KEYCLOAK_DIR}"
-  terraform_destroy "${INFRA_DIR}"
+  local bootstrap_env_loaded=false
+  if [[ -f "${bootstrap_env}" ]]; then
+    # shellcheck disable=SC1090
+    source "${bootstrap_env}"
+    bootstrap_env_loaded=true
+  else
+    log "Bootstrap env not found, falling back to best-effort container/network cleanup."
+  fi
+
+  if [[ "${bootstrap_env_loaded}" == "true" ]]; then
+    terraform_destroy "${KEYCLOAK_DIR}"
+    terraform_destroy "${INFRA_DIR}"
+  else
+    log "Skipping terraform destroy because bootstrap state was never persisted."
+  fi
 
   local container
   for container in "${WEAVE_CONTAINERS[@]}"; do
