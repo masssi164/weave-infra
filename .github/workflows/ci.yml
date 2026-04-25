@@ -24,6 +24,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   WEAVE_BACKEND_IMAGE: ${{ github.event.inputs.weave_backend_image || 'weave-backend:smoke-ci' }}
   REQUESTED_WEAVE_BACKEND_REF: ${{ github.event.inputs.weave_backend_ref || github.head_ref || github.ref_name || 'main' }}
+  DOCKER_BUILDKIT: '1'
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
