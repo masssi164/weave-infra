@@ -351,7 +351,7 @@ ensure_postgres_bootstrap_applied() {
 
   log "Ensuring PostgreSQL bootstrap state is applied..."
 
-  for attempt in $(seq 1 30); do
+  for _attempt in $(seq 1 30); do
     if docker exec weave-db pg_isready -U "${TF_VAR_db_admin_username}" -d postgres >/dev/null 2>&1; then
       docker exec -e PGPASSWORD="${TF_VAR_db_admin_password}" -i weave-db \
         psql -v ON_ERROR_STOP=1 -U "${TF_VAR_db_admin_username}" -d postgres < "${sql_file}"
