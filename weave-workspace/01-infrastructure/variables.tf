@@ -136,7 +136,7 @@ variable "backend_container_port" {
 variable "weave_backend_image" {
   description = "Docker image for the Weave backend service."
   type        = string
-  default     = "ghcr.io/masssi164/weave-backend:latest"
+  default     = "weave-backend:local"
 }
 
 variable "nextcloud_trusted_proxies" {

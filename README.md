@@ -117,7 +117,7 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>_synapse`
 - `<db_name>` (Nextcloud stores its tables in schema `nextcloud` here)
 
-The Weave backend is deployed as `weave-backend`, routed through `<tenant_domain>/api`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` with a locally built tag or pinned release digest for deterministic validation; the self-hosted live-stack CI path always builds the backend image from the selected backend ref before bootstrapping infra.
+The Weave backend is deployed as `weave-backend`, routed through `<tenant_domain>/api`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. The default local image tag is `weave-backend:local`; set `TF_VAR_weave_backend_image` to a locally built tag or pinned release digest for deterministic validation. The self-hosted live-stack CI path always builds the backend image from the selected backend ref before bootstrapping infra.
 
 The Matrix stack uses Matrix Authentication Service delegated auth through MAS' modern Synapse adapter. Keep the default MAS image unless an override has been checked against the generated `synapse_modern` config and `on_conflict: set` localpart policy. Keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later so MAS can provision and link users through the homeserver MAS API.
 

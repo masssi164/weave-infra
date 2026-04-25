@@ -170,7 +170,7 @@ load_persisted_env() {
     unset TF_VAR_files_subdomain
   fi
 
-  # Migrate the legacy raw Nextcloud hostname from nextcloud.<tenant_domain>
+  # Migrate the legacy Nextcloud hostname from nextcloud.<tenant_domain>
   # to files.<tenant_domain> unless the caller already set a value.
   if [[ ! "${preset_names_joined}" =~ " TF_VAR_nextcloud_subdomain " ]] &&
     [[ "${TF_VAR_nextcloud_subdomain:-}" == "nextcloud" ]]; then
@@ -475,7 +475,7 @@ ensure_default_inputs() {
     "TF_VAR_nextcloud_trusted_proxies=172.16.0.0/12"
     "TF_VAR_backend_host_port=48084"
     "TF_VAR_backend_container_port=8080"
-    "TF_VAR_weave_backend_image=ghcr.io/masssi164/weave-backend:latest"
+    "TF_VAR_weave_backend_image=weave-backend:local"
     "TF_VAR_synapse_uid=991"
     "TF_VAR_synapse_gid=991"
     "TF_VAR_db_name=weave"

@@ -58,7 +58,7 @@ variable "calendar_product_url" {
   type        = string
 }
 
-variable "nextcloud_raw_base_url" {
+variable "nextcloud_base_url" {
   description = "Canonical Nextcloud base URL."
   type        = string
 }

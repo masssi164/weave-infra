@@ -339,7 +339,7 @@ module "backend" {
   matrix_base_url        = local.public_urls.matrix
   files_product_url      = "${local.public_urls.weave}/files"
   calendar_product_url   = "${local.public_urls.weave}/calendar"
-  nextcloud_raw_base_url = local.public_urls.nextcloud
+  nextcloud_base_url     = local.public_urls.nextcloud
   oidc_issuer_uri        = local.keycloak_issuer_url
   oidc_jwk_set_uri       = local.keycloak_jwk_set_uri
   oidc_required_audience = local.weave_backend_audience

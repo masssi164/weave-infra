@@ -40,9 +40,8 @@ resource "docker_container" "this" {
     "WEAVE_MATRIX_BASE_URL=${var.matrix_base_url}",
     "WEAVE_FILES_PRODUCT_URL=${var.files_product_url}",
     "WEAVE_CALENDAR_PRODUCT_URL=${var.calendar_product_url}",
-    "WEAVE_NEXTCLOUD_RAW_BASE_URL=${var.nextcloud_raw_base_url}",
     "WEAVE_MATRIX_HOMESERVER_URL=${var.matrix_base_url}",
-    "WEAVE_NEXTCLOUD_BASE_URL=${var.nextcloud_raw_base_url}",
+    "WEAVE_NEXTCLOUD_BASE_URL=${var.nextcloud_base_url}",
   ]
 
   ports {
