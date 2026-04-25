@@ -24,7 +24,7 @@ Operators should expose these HTTPS origins:
 - `https://<tenant_domain>` for the Weave product gateway and `/api`, `/files`, `/calendar` routes
 - `https://auth.<tenant_domain>`
 - `https://matrix.<tenant_domain>`
-- `https://files.<tenant_domain>` as the raw Nextcloud fallback
+- `https://files.<tenant_domain>` as the canonical Nextcloud URL
 
 For the current preferred contract, use:
 
@@ -109,8 +109,8 @@ Use `weave-workspace/release-verify.sh` with:
 
 - `WEAVE_BASE_URL`
 - `WEAVE_OIDC_ISSUER_URL`
-- `WEAVE_NEXTCLOUD_URL`
-- `WEAVE_MATRIX_URL`
+- `WEAVE_NEXTCLOUD_BASE_URL` (`WEAVE_NEXTCLOUD_URL` is accepted as a compatibility alias)
+- `WEAVE_MATRIX_HOMESERVER_URL` (`WEAVE_MATRIX_URL` is accepted as a compatibility alias)
 - optional `WEAVE_TLS_CA_FILE` when a private CA is required
 
 The script checks:

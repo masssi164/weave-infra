@@ -28,7 +28,7 @@ variable "matrix_subdomain" {
 }
 
 variable "nextcloud_subdomain" {
-  description = "Subdomain used for the raw Nextcloud fallback."
+  description = "Subdomain used for the canonical Nextcloud URL."
   type        = string
   default     = "files"
 }

@@ -59,11 +59,11 @@ Set `WEAVE_REMOVE_VOLUMES=true` when you also want to remove persisted Docker vo
 The public local contract is HTTPS on these hostnames:
 
 - `https://auth.weave.local`
-- `https://files.weave.local` as the raw Nextcloud fallback
+- `https://files.weave.local` as the canonical Nextcloud URL
 - `https://matrix.weave.local`
 - `https://weave.local/api`
-- `https://weave.local/files`
-- `https://weave.local/calendar`
+- `https://weave.local/files` (Weave product files route, not direct Nextcloud)
+- `https://weave.local/calendar` (Weave product calendar route)
 
 Use the generated local CA path printed by `install.sh`, or pre-create mkcert certificates before running the installer.
 
@@ -117,7 +117,7 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>_synapse`
 - `<db_name>` (Nextcloud stores its tables in schema `nextcloud` here)
 
-The Weave backend is deployed as `weave-backend`, routed through `<tenant_domain>/api`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` when using a backend image other than the default `ghcr.io/masssi164/weave-backend:latest`.
+The Weave backend is deployed as `weave-backend`, routed through `<tenant_domain>/api`, and configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. Override `TF_VAR_weave_backend_image` with a locally built tag or pinned release digest for deterministic validation; the self-hosted live-stack CI path always builds the backend image from the selected backend ref before bootstrapping infra.
 
 The Matrix stack uses Matrix Authentication Service delegated auth through MAS' modern Synapse adapter. Keep the default MAS image unless an override has been checked against the generated `synapse_modern` config and `on_conflict: set` localpart policy. Keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later so MAS can provision and link users through the homeserver MAS API.
 
@@ -155,7 +155,7 @@ bash weave-workspace/release-verify.sh
 bash weave-workspace/operator-check.sh
 ```
 
-with `WEAVE_BASE_URL`, `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_URL`, and `WEAVE_MATRIX_URL` exported from your operator env file.
+with `WEAVE_BASE_URL`, `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_BASE_URL`, and `WEAVE_MATRIX_HOMESERVER_URL` exported from your operator env file. `WEAVE_NEXTCLOUD_URL` and `WEAVE_MATRIX_URL` remain accepted as compatibility aliases in verification scripts.
 
 `release-verify.sh` confirms the public Release 1 contract. `operator-check.sh` adds host-local checks for the managed containers plus loopback service health so operators can distinguish public routing failures from service failures.
 
@@ -166,7 +166,7 @@ The stack expects these names to resolve to `127.0.0.1`:
 - `<tenant_domain>` for the Weave product gateway
 - `auth.<tenant_domain>`
 - `matrix.<tenant_domain>`
-- `files.<tenant_domain>` for the raw Nextcloud fallback
+- `files.<tenant_domain>` for the canonical Nextcloud URL
 
 Default `/etc/hosts` line:
 

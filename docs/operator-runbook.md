@@ -10,7 +10,7 @@ Prepare these explicitly:
 - DNS for `<tenant_domain>` for the Weave product gateway
 - DNS for `auth.<tenant_domain>`
 - DNS for `matrix.<tenant_domain>`
-- DNS for `files.<tenant_domain>` as the raw Nextcloud fallback
+- DNS for `files.<tenant_domain>` as the canonical Nextcloud URL
 - a filled, private copy of `weave-workspace/release.env.example`
 - pinned image references, especially `TF_VAR_weave_backend_image`
 - TLS certificate and key readable by the operator account

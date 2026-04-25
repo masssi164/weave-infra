@@ -109,8 +109,8 @@ load_bootstrap_env
 
 : "${WEAVE_BASE_URL:=$(product_public_url)/api}"
 : "${WEAVE_OIDC_ISSUER_URL:=$(public_url "${TF_VAR_auth_subdomain:-auth}")/realms/${TF_VAR_tenant_slug:-weave}}"
-: "${WEAVE_NEXTCLOUD_URL:=$(public_url "${TF_VAR_nextcloud_subdomain:-files}")}"
-: "${WEAVE_MATRIX_URL:=$(public_url "${TF_VAR_matrix_subdomain:-matrix}")}"
+: "${WEAVE_NEXTCLOUD_BASE_URL:=${WEAVE_NEXTCLOUD_URL:-$(public_url "${TF_VAR_nextcloud_subdomain:-files}")}}"
+: "${WEAVE_MATRIX_HOMESERVER_URL:=${WEAVE_MATRIX_URL:-$(public_url "${TF_VAR_matrix_subdomain:-matrix}")}}"
 
 log "Checking core containers..."
 for container in weave-proxy weave-keycloak weave-backend weave-mas weave-synapse weave-nextcloud weave-db; do
@@ -130,14 +130,14 @@ assert_json "${issuer_config}" ".issuer == \"${WEAVE_OIDC_ISSUER_URL}\"" "public
 backend_health="$(curl_json "${WEAVE_BASE_URL}/health/ready")"
 assert_json "${backend_health}" '.status == "up"' "public backend readiness should report up"
 
-nextcloud_status="$(curl_json "${WEAVE_NEXTCLOUD_URL}/status.php")"
+nextcloud_status="$(curl_json "${WEAVE_NEXTCLOUD_BASE_URL}/status.php")"
 assert_json "${nextcloud_status}" '.installed == true' "Nextcloud should be installed"
 
-mas_discovery="$(curl_json "${WEAVE_MATRIX_URL}/.well-known/openid-configuration")"
-assert_json "${mas_discovery}" ".issuer == \"${WEAVE_MATRIX_URL}/\"" "MAS issuer should match the public matrix URL"
+mas_discovery="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/.well-known/openid-configuration")"
+assert_json "${mas_discovery}" ".issuer == \"${WEAVE_MATRIX_HOMESERVER_URL}/\"" "MAS issuer should match the public matrix URL"
 
-matrix_auth_metadata="$(curl_json "${WEAVE_MATRIX_URL}/_matrix/client/v1/auth_metadata")"
-assert_json "${matrix_auth_metadata}" ".issuer == \"${WEAVE_MATRIX_URL}/\"" "Matrix OAuth metadata should be served by MAS"
+matrix_auth_metadata="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/_matrix/client/v1/auth_metadata")"
+assert_json "${matrix_auth_metadata}" ".issuer == \"${WEAVE_MATRIX_HOMESERVER_URL}/\"" "Matrix OAuth metadata should be served by MAS"
 assert_json "${matrix_auth_metadata}" '.authorization_endpoint | contains("/authorize")' "Matrix OAuth metadata should expose the MAS authorization endpoint"
 
 log "Operator checks passed."

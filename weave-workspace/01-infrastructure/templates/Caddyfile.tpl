@@ -13,7 +13,7 @@ ${weave_site_addresses} {
 
 	@files path /files /files/*
 	handle @files {
-		respond "Weave files product route. Raw Nextcloud fallback: ${nextcloud_public_url}" 200
+		respond "Weave files product route. Canonical Nextcloud URL: ${nextcloud_public_url}" 200
 	}
 
 	@calendar path /calendar /calendar/*

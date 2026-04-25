@@ -198,11 +198,16 @@ persist_bootstrap_env() {
     fi
   done
 
+  {
+    printf 'export WEAVE_BASE_URL=%q\n' "$(integration_test_base_url)"
+    printf 'export WEAVE_NEXTCLOUD_BASE_URL=%q\n' "${TF_VAR_public_scheme}://$(public_host "${TF_VAR_nextcloud_subdomain}")$(public_port_suffix)"
+    printf 'export WEAVE_MATRIX_HOMESERVER_URL=%q\n' "${TF_VAR_public_scheme}://$(public_host "${TF_VAR_matrix_subdomain}")$(public_port_suffix)"
+    printf 'export WEAVE_OIDC_ISSUER_URL=%q\n' "$(integration_test_oidc_issuer_url)"
+    printf 'export WEAVE_OIDC_CLIENT_ID=%q\n' "weave-app"
+  } >> "${BOOTSTRAP_ENV_FILE}"
+
   if create_test_user_enabled; then
     {
-      printf 'export WEAVE_BASE_URL=%q\n' "$(integration_test_base_url)"
-      printf 'export WEAVE_OIDC_ISSUER_URL=%q\n' "$(integration_test_oidc_issuer_url)"
-      printf 'export WEAVE_OIDC_CLIENT_ID=%q\n' "weave-app"
       printf 'export WEAVE_TEST_USERNAME=%q\n' "${TEST_USER_EMAIL}"
       printf 'export WEAVE_TEST_PASSWORD=%q\n' "${TF_VAR_test_user_password}"
     } >> "${BOOTSTRAP_ENV_FILE}"
@@ -718,7 +723,7 @@ print_summary() {
   log "Weave app post-logout redirect: com.massimotter.weave:/logout"
   log "Keycloak admin user: ${TF_VAR_keycloak_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
   log "Nextcloud admin user: ${TF_VAR_nextcloud_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
-  log "Raw Nextcloud fallback URL: ${nextcloud_url}"
+  log "Canonical Nextcloud URL: ${nextcloud_url}"
   log "Weave product URL: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}"
   log "Weave product files route: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}/files"
   log "Weave product calendar route: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}/calendar"
@@ -727,7 +732,7 @@ print_summary() {
 
   if create_test_user_enabled; then
     log "Test user: ${TEST_USER_EMAIL} (password stored in ${BOOTSTRAP_ENV_FILE})"
-    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_OIDC_ISSUER_URL=${issuer_url} WEAVE_OIDC_CLIENT_ID=${weave_client_id} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=<stored in bootstrap env>"
+    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_NEXTCLOUD_BASE_URL=${nextcloud_url} WEAVE_MATRIX_HOMESERVER_URL=${TF_VAR_public_scheme}://$(public_host "${TF_VAR_matrix_subdomain}")${suffix} WEAVE_OIDC_ISSUER_URL=${issuer_url} WEAVE_OIDC_CLIENT_ID=${weave_client_id} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=<stored in bootstrap env>"
   fi
 }
 
