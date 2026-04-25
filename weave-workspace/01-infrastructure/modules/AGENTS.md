@@ -21,7 +21,7 @@ These child modules keep the root stage orchestration-only.
   - `outputs.tf`: container and volume identifiers.
 - `backend/`
   - `AGENTS.md`: module summary and ownership notes.
-  - `main.tf`: Weave backend image, container, healthcheck, OIDC environment, and Traefik labels.
+  - `main.tf`: Weave backend image, container, healthcheck, OIDC environment, and Docker network aliases.
   - `variables.tf`: image, port, hostname, and OIDC contract inputs.
   - `outputs.tf`: container identifier.
 - `matrix/`

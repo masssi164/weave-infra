@@ -6,17 +6,6 @@ terraform {
   }
 }
 
-locals {
-  # Issue #3 tracks any future Caddy migration; the API host route is currently implemented with Traefik labels.
-  traefik_labels = {
-    "traefik.enable"                                               = "true"
-    "traefik.docker.network"                                       = var.network_name
-    "traefik.http.routers.weave-backend.rule"                      = "Host(`${var.public_host}`)"
-    "traefik.http.routers.weave-backend.entrypoints"               = "web"
-    "traefik.http.services.weave-backend.loadbalancer.server.port" = tostring(var.container_port)
-  }
-}
-
 resource "docker_image" "this" {
   name         = var.image_name
   keep_locally = true
@@ -58,14 +47,6 @@ resource "docker_container" "this" {
     timeout      = "5s"
     retries      = 12
     start_period = "30s"
-  }
-
-  dynamic "labels" {
-    for_each = local.traefik_labels
-    content {
-      label = labels.key
-      value = labels.value
-    }
   }
 
   networks_advanced {
