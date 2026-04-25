@@ -267,9 +267,9 @@ resource "terraform_data" "postgres_bootstrap" {
       set -euo pipefail
 
       for attempt in $(seq 1 60); do
-        if docker exec "$${CONTAINER_NAME}" pg_isready -U "$${DATABASE_USER}" -d "$${DATABASE_NAME}" >/dev/null 2>&1; then
+        if docker exec "$${CONTAINER_NAME}" pg_isready -h 127.0.0.1 -U "$${DATABASE_USER}" -d "$${DATABASE_NAME}" >/dev/null 2>&1; then
           docker exec -e PGPASSWORD="$${DATABASE_PASS}" -i "$${CONTAINER_NAME}" \
-            psql -v ON_ERROR_STOP=1 -U "$${DATABASE_USER}" -d "$${DATABASE_NAME}" < "$${SQL_FILE}"
+            psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$${DATABASE_USER}" -d "$${DATABASE_NAME}" < "$${SQL_FILE}"
           exit 0
         fi
 
