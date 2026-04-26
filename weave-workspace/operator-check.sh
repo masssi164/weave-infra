@@ -43,14 +43,14 @@ public_url() {
   printf '%s://%s.%s%s' \
     "${TF_VAR_public_scheme:-https}" \
     "${subdomain}" \
-    "${TF_VAR_tenant_domain:?Expected TF_VAR_tenant_domain in env or bootstrap env}" \
+    "${TF_VAR_tenant_domain:-weave.local}" \
     "$(public_port_suffix)"
 }
 
 product_public_url() {
   printf '%s://%s%s' \
     "${TF_VAR_public_scheme:-https}" \
-    "${TF_VAR_tenant_domain:?Expected TF_VAR_tenant_domain in env or bootstrap env}" \
+    "${TF_VAR_tenant_domain:-weave.local}" \
     "$(public_port_suffix)"
 }
 
@@ -79,6 +79,19 @@ curl_json() {
   done < <(curl_common_args)
 
   curl "${args[@]}" "$url"
+}
+
+curl_status() {
+  local url="$1"
+  local -a args=(--silent --show-error)
+
+  if [[ -n "${WEAVE_TLS_CA_FILE:-}" ]]; then
+    args+=(--cacert "${WEAVE_TLS_CA_FILE}")
+  elif [[ -n "${TF_VAR_caddy_tls_ca_file:-}" && -f "${TF_VAR_caddy_tls_ca_file}" ]]; then
+    args+=(--cacert "${TF_VAR_caddy_tls_ca_file}")
+  fi
+
+  curl "${args[@]}" -o /dev/null -w '%{http_code}' "$url"
 }
 
 assert_container_running() {
@@ -112,6 +125,7 @@ require_command jq
 load_bootstrap_env
 
 : "${WEAVE_BASE_URL:=$(api_public_url)/api}"
+: "${WEAVE_PUBLIC_BASE_URL:=$(product_public_url)}"
 : "${WEAVE_OIDC_ISSUER_URL:=$(public_url "${TF_VAR_auth_subdomain:-auth}")/realms/${TF_VAR_tenant_slug:-weave}}"
 : "${WEAVE_NEXTCLOUD_BASE_URL:=$(public_url "${TF_VAR_nextcloud_subdomain:-files}")}"
 : "${WEAVE_MATRIX_HOMESERVER_URL:=$(public_url "${TF_VAR_matrix_subdomain:-matrix}")}"
@@ -127,7 +141,16 @@ assert_http_200 "Weave backend" "http://127.0.0.1:${TF_VAR_backend_host_port:-48
 assert_http_200 "MAS" "http://127.0.0.1:${TF_VAR_mas_host_port:-48082}/health"
 assert_http_200 "Synapse" "http://127.0.0.1:${TF_VAR_synapse_host_port:-48008}/_matrix/client/versions"
 
-log "Checking public issuer, API, files, and matrix URLs..."
+log "Checking public product, issuer, API, files, and matrix routes..."
+product_status="$(curl_status "${WEAVE_PUBLIC_BASE_URL}/")"
+[[ "${product_status}" == "200" ]] || fail "Operator check failed: Weave product gateway returned HTTP ${product_status} at ${WEAVE_PUBLIC_BASE_URL}/"
+
+files_product_status="$(curl_status "${WEAVE_PUBLIC_BASE_URL}/files")"
+[[ "${files_product_status}" == "200" ]] || fail "Operator check failed: Weave product files route returned HTTP ${files_product_status} at ${WEAVE_PUBLIC_BASE_URL}/files"
+
+calendar_product_status="$(curl_status "${WEAVE_PUBLIC_BASE_URL}/calendar")"
+[[ "${calendar_product_status}" == "200" ]] || fail "Operator check failed: Weave product calendar route returned HTTP ${calendar_product_status} at ${WEAVE_PUBLIC_BASE_URL}/calendar"
+
 issuer_config="$(curl_json "${WEAVE_OIDC_ISSUER_URL}/.well-known/openid-configuration")"
 assert_json "${issuer_config}" ".issuer == \"${WEAVE_OIDC_ISSUER_URL}\"" "public Keycloak issuer should match the configured release URL"
 
@@ -146,6 +169,9 @@ assert_json "${nextcloud_oidc_provider}" '.settings.bearerProvisioning == true o
 
 mas_discovery="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/.well-known/openid-configuration")"
 assert_json "${mas_discovery}" ".issuer == \"${WEAVE_MATRIX_HOMESERVER_URL}/\"" "MAS issuer should match the public matrix URL"
+
+matrix_versions="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/_matrix/client/versions")"
+assert_json "${matrix_versions}" '.versions | type == "array"' "public Matrix client versions route should be served by Synapse"
 
 matrix_auth_metadata="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/_matrix/client/v1/auth_metadata")"
 assert_json "${matrix_auth_metadata}" ".issuer == \"${WEAVE_MATRIX_HOMESERVER_URL}/\"" "Matrix OAuth metadata should be served by MAS"

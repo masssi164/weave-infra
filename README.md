@@ -30,7 +30,7 @@ Run `make dev-hosts` from the repository root to print the default `/etc/hosts` 
 
 `install.sh` now defaults to a shared-host-safe isolated port block, generates secrets and local TLS certificates when they are not already exported as `TF_VAR_*`, applies both Terraform stages in order, waits for readiness, and bootstraps the Nextcloud `user_oidc` app.
 
-For repeatable local runs, generated bootstrap inputs are persisted in `weave-workspace/.generated/bootstrap.env`, mirrored to `/tmp/weave-infra/weave-workspace/.generated/bootstrap.env` for the self-hosted GitHub runner flow, and reused on subsequent installs unless you override them explicitly with environment variables.
+For repeatable local runs, generated bootstrap inputs are persisted in `weave-workspace/.generated/bootstrap.env`, mirrored to the self-hosted runner bootstrap cache when applicable, and reused on subsequent installs unless you override them explicitly with environment variables. The installer also writes a no-secrets app configuration summary to `weave-workspace/.generated/app-config.env`.
 
 The installer probes local services through `127.0.0.1` rather than bare `localhost` so Docker port checks stay reliable on hosts where IPv6 loopback behaves differently.
 
@@ -64,7 +64,7 @@ The public local contract is HTTPS on these hostnames:
 - `https://api.weave.local/api` as the canonical backend API
 - `https://auth.weave.local`
 - `https://matrix.weave.local`
-- `https://files.weave.local` as the canonical Nextcloud URL
+- `https://files.weave.local` as the raw Nextcloud technical/admin/protocol fallback
 
 Use the generated local CA path printed by `install.sh`, or pre-create mkcert certificates before running the installer.
 
@@ -164,11 +164,11 @@ with `WEAVE_BASE_URL`, `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_BASE_URL`, and 
 
 The stack expects these names to resolve to `127.0.0.1`:
 
-- `<tenant_domain>` for the Weave product gateway
+- `<tenant_domain>` for the Weave product gateway, including `/files` and `/calendar` product routes
 - `api.<tenant_domain>` for the canonical backend API origin
 - `auth.<tenant_domain>`
 - `matrix.<tenant_domain>`
-- `files.<tenant_domain>` for the canonical Nextcloud URL
+- `files.<tenant_domain>` for the raw Nextcloud technical/admin/protocol fallback
 
 Default `/etc/hosts` line:
 
@@ -195,6 +195,8 @@ export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.en
 ```
 
 `WEAVE_BASE_URL` must match the canonical Caddy API route under `api.<tenant_domain>/api`. `WEAVE_OIDC_ISSUER_URL` must match the public Keycloak issuer used in access tokens. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
+
+For local app/runtime configuration without secrets, source or inspect `weave-workspace/.generated/app-config.env`. It includes the product gateway, backend API, auth issuer, Matrix homeserver, Weave product files/calendar routes, and a clearly labeled `WEAVE_NEXTCLOUD_TECHNICAL_BASE_URL` for raw Nextcloud admin/protocol fallback only.
 
 The test user is disabled by default. Enable it only for local integration testing and smoke validation:
 

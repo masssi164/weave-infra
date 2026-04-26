@@ -10,7 +10,7 @@ Prepare these explicitly:
 - DNS for `<tenant_domain>` for the Weave product gateway
 - DNS for `auth.<tenant_domain>`
 - DNS for `matrix.<tenant_domain>`
-- DNS for `files.<tenant_domain>` as the canonical Nextcloud URL
+- DNS for `files.<tenant_domain>` as the raw Nextcloud technical/admin/protocol fallback
 - a filled, private copy of `weave-workspace/release.env.example`
 - pinned image references, especially `TF_VAR_weave_backend_image`
 - TLS certificate and key readable by the operator account
@@ -83,7 +83,7 @@ What `operator-check.sh` adds beyond `release-verify.sh`:
 
 - confirms the core containers exist and are running
 - checks loopback health endpoints for Keycloak, MAS, Synapse, and backend
-- checks the public origins through the configured release URLs
+- checks the public product, backend, auth, Matrix, and raw Nextcloud fallback routes through the configured release URLs
 
 ## 5. Backup expectations
 
@@ -146,7 +146,7 @@ Escalate quickly when any of these fail:
 - Keycloak discovery does not match the public issuer URL
 - backend health is not `UP`
 - Nextcloud `status.php` is not installed/healthy
-- Matrix delegated auth discovery or `/authorize` is unavailable
+- Matrix delegated auth discovery, client versions, or `/authorize` is unavailable
 
 ## 8. Known Release 1 limits
 
