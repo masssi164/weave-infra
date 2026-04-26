@@ -35,7 +35,7 @@ For the current preferred contract, use:
 - `https://matrix.weave.example`
 - `https://files.weave.example`
 
-`https://<tenant_domain>/api`, `keycloak.<tenant_domain>`, and `nextcloud.<tenant_domain>` are compatibility aliases only when an operator intentionally preserves them. Pick one public contract and keep backend, mobile, Caddy, and operator docs aligned.
+Do not expose public aliases for older Keycloak, Nextcloud, or product-gateway API routes. Keep backend, mobile, Caddy, and operator docs aligned to the canonical public contract above.
 
 ## Required operator inputs
 
@@ -62,7 +62,7 @@ Do not rely on the generated local CA flow outside development.
 
 Recommended pattern:
 
-1. issue a SAN certificate for the five canonical public hostnames, plus any compatibility aliases you intentionally preserve
+1. issue a SAN certificate for the five canonical public hostnames
 2. place the cert and key on the host with restrictive permissions
 3. set `TF_VAR_caddy_tls_cert_file` and `TF_VAR_caddy_tls_key_file` to those absolute paths
 4. leave `TF_VAR_caddy_tls_ca_file` unset unless your issuer is private and clients must trust an extra CA
@@ -112,8 +112,8 @@ Use `weave-workspace/release-verify.sh` with:
 
 - `WEAVE_BASE_URL`
 - `WEAVE_OIDC_ISSUER_URL`
-- `WEAVE_NEXTCLOUD_BASE_URL` (`WEAVE_NEXTCLOUD_URL` is accepted as a compatibility alias)
-- `WEAVE_MATRIX_HOMESERVER_URL` (`WEAVE_MATRIX_URL` is accepted as a compatibility alias)
+- `WEAVE_NEXTCLOUD_BASE_URL`
+- `WEAVE_MATRIX_HOMESERVER_URL`
 - optional `WEAVE_TLS_CA_FILE` when a private CA is required
 
 The script checks:

@@ -140,7 +140,6 @@ load_persisted_env() {
 
   local var
   local index
-  local preset_names_joined=""
   local -a preset_names=()
   local -a preset_values=()
 
@@ -159,31 +158,6 @@ load_persisted_env() {
     export "${preset_names[$index]}=${preset_values[$index]}"
   done
 
-  if (( ${#preset_names[@]} > 0 )); then
-    preset_names_joined=" ${preset_names[*]} "
-  fi
-
-  # Preserve compatibility with older bootstrap environments that used
-  # TF_VAR_files_subdomain before the contract was renamed.
-  if [[ ! "${preset_names_joined}" =~ " TF_VAR_nextcloud_subdomain " ]] &&
-    [[ -n "${TF_VAR_files_subdomain:-}" ]]; then
-    export TF_VAR_nextcloud_subdomain="${TF_VAR_files_subdomain}"
-    unset TF_VAR_files_subdomain
-  fi
-
-  # Migrate the legacy Nextcloud hostname from nextcloud.<tenant_domain>
-  # to files.<tenant_domain> unless the caller already set a value.
-  if [[ ! "${preset_names_joined}" =~ " TF_VAR_nextcloud_subdomain " ]] &&
-    [[ "${TF_VAR_nextcloud_subdomain:-}" == "nextcloud" ]]; then
-    export TF_VAR_nextcloud_subdomain="files"
-  fi
-
-  # Migrate the old Keycloak default from keycloak.<tenant_domain> to
-  # auth.<tenant_domain> unless the caller already set a value.
-  if [[ ! "${preset_names_joined}" =~ " TF_VAR_auth_subdomain " ]] &&
-    [[ "${TF_VAR_auth_subdomain:-}" == "keycloak" ]]; then
-    export TF_VAR_auth_subdomain="auth"
-  fi
 }
 
 persist_bootstrap_env() {
@@ -549,8 +523,6 @@ certificate_alt_names() {
     "$(public_host "${TF_VAR_auth_subdomain}")"
     "$(public_host "${TF_VAR_nextcloud_subdomain}")"
     "$(public_host "${TF_VAR_matrix_subdomain}")"
-    "keycloak.${TF_VAR_tenant_domain}"
-    "nextcloud.${TF_VAR_tenant_domain}"
   )
 
   for host in "${hosts[@]}"; do
@@ -581,8 +553,6 @@ ensure_local_tls_certificates() {
       "$(public_host "${TF_VAR_auth_subdomain}")"
       "$(public_host "${TF_VAR_nextcloud_subdomain}")"
       "$(public_host "${TF_VAR_matrix_subdomain}")"
-      "keycloak.${TF_VAR_tenant_domain}"
-      "nextcloud.${TF_VAR_tenant_domain}"
     )
 
     for host in "${required_hosts[@]}"; do
@@ -596,7 +566,7 @@ ensure_local_tls_certificates() {
     fi
 
     if [[ ! -f "${ca_key_file}" ]]; then
-      fail "Existing local TLS certificate at ${cert_file} does not cover required hosts: ${missing_hosts[*]}. Provide a replacement cert/key that includes the canonical API host and compatibility aliases, or restore ${ca_key_file} so install.sh can regenerate the leaf certificate."
+      fail "Existing local TLS certificate at ${cert_file} does not cover required hosts: ${missing_hosts[*]}. Provide a replacement cert/key that includes the canonical public hostnames, or restore ${ca_key_file} so install.sh can regenerate the leaf certificate."
     fi
 
     log "Regenerating local TLS leaf certificate to cover: ${missing_hosts[*]}"
@@ -698,7 +668,7 @@ configure_nextcloud_base_url() {
   occ config:system:set trusted_domains 0 --value="${nextcloud_host}"
   occ config:system:set trusted_domains 1 --value="localhost"
   occ config:system:set trusted_domains 2 --value="127.0.0.1"
-  occ config:system:set trusted_domains 3 --value="nextcloud.${TF_VAR_tenant_domain}"
+  occ config:system:delete trusted_domains 3 >/dev/null 2>&1 || true
   occ config:system:set overwritehost --value="${nextcloud_host}$(public_port_suffix)"
   occ config:system:set overwrite.cli.url --value="${nextcloud_url}"
   occ config:system:set overwriteprotocol --value="${TF_VAR_public_scheme}"
@@ -760,7 +730,6 @@ print_summary() {
   log
   log "Add these host entries before using the browser-facing URLs:"
   log "127.0.0.1 ${TF_VAR_tenant_domain} $(public_host "${TF_VAR_api_subdomain}") $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}")"
-  log "Optional compatibility aliases: 127.0.0.1 keycloak.${TF_VAR_tenant_domain} nextcloud.${TF_VAR_tenant_domain}"
   log
   log "Trust this local TLS CA certificate on the host before opening browser URLs:"
   log "${TF_VAR_caddy_tls_ca_file}"
@@ -775,7 +744,6 @@ print_summary() {
   log "Weave product files route: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}/files"
   log "Weave product calendar route: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}/calendar"
   log "Weave backend API URL: ${backend_url}"
-  log "Weave backend compatibility URL: $(product_public_url)/api"
   log "Weave backend health: http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/actuator/health"
 
   if create_test_user_enabled; then

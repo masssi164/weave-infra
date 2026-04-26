@@ -73,7 +73,6 @@ The Flutter app may request `openid profile email`; `weave:workspace` is assigne
   - `WEAVE_OIDC_REQUIRED_AUDIENCE=weave-app`
   - `WEAVE_CLIENT_ID=weave-app`
 - Public API URL: `https://api.weave.local/api`
-- Compatibility API URL: `https://weave.local/api`
 - Direct health URL: `http://127.0.0.1:8084/actuator/health`
 
 ### Matrix Authentication Service
@@ -152,6 +151,4 @@ The infrastructure stage exports:
 - `weave_backend_client_id`
 - `public_urls.api` with the backend available at `/api`
 - `weave_api_base_url`
-- `weave_api_compatibility_url`
-- `public_urls.weave` with `/api` preserved as a compatibility route
 - `service_names.backend`

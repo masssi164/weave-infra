@@ -1,21 +1,16 @@
 output "public_hosts" {
-  description = "Browser-facing hostnames reserved by the local stack contract, including compatibility aliases."
+  description = "Browser-facing hostnames reserved by the local stack contract."
   value       = local.public_hosts
 }
 
 output "public_urls" {
-  description = "Browser-facing URLs reserved by the local stack contract, including compatibility aliases."
+  description = "Browser-facing URLs reserved by the local stack contract."
   value       = local.public_urls
 }
 
 output "weave_api_base_url" {
   description = "Canonical public Weave backend API base URL."
   value       = "${local.public_urls.api}/api"
-}
-
-output "weave_api_compatibility_url" {
-  description = "Temporary product-gateway API compatibility URL."
-  value       = "${local.public_urls.weave}/api"
 }
 
 output "weave_files_product_url" {

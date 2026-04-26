@@ -19,8 +19,6 @@ services:
           - ${TF_VAR_auth_subdomain:-auth}.${TF_VAR_tenant_domain:-weave.local}
           - ${TF_VAR_nextcloud_subdomain:-files}.${TF_VAR_tenant_domain:-weave.local}
           - ${TF_VAR_matrix_subdomain:-matrix}.${TF_VAR_tenant_domain:-weave.local}
-          - keycloak.${TF_VAR_tenant_domain:-weave.local}
-          - nextcloud.${TF_VAR_tenant_domain:-weave.local}
 
 volumes:
   weave_caddy_data:

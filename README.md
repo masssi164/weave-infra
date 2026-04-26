@@ -66,12 +66,6 @@ The public local contract is HTTPS on these hostnames:
 - `https://matrix.weave.local`
 - `https://files.weave.local` as the canonical Nextcloud URL
 
-Temporary compatibility aliases are also served when their hostnames resolve locally:
-
-- `https://weave.local/api` -> backend API compatibility route
-- `https://keycloak.weave.local` -> redirects to `https://auth.weave.local`
-- `https://nextcloud.weave.local` -> redirects to `https://files.weave.local`
-
 Use the generated local CA path printed by `install.sh`, or pre-create mkcert certificates before running the installer.
 
 Generated-CA flow:
@@ -90,7 +84,7 @@ mkcert -install
 mkcert \
   -cert-file 01-infrastructure/.generated/caddy/certs/weave.local.pem \
   -key-file 01-infrastructure/.generated/caddy/certs/weave.local-key.pem \
-  weave.local api.weave.local auth.weave.local files.weave.local matrix.weave.local keycloak.weave.local nextcloud.weave.local
+  weave.local api.weave.local auth.weave.local files.weave.local matrix.weave.local
 cp "$(mkcert -CAROOT)/rootCA.pem" 01-infrastructure/.generated/caddy/certs/weave-local-ca.pem
 ./install.sh
 ```
@@ -124,7 +118,7 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>_synapse`
 - `<db_name>` (Nextcloud stores its tables in schema `nextcloud` here)
 
-The Weave backend is deployed as `weave-backend`, routed canonically through `api.<tenant_domain>/api`, and also available through `<tenant_domain>/api` as a documented compatibility route. It is configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. The default local image tag is `weave-backend:local`; set `TF_VAR_weave_backend_image` to a locally built tag or pinned release digest for deterministic validation. The self-hosted live-stack CI path always builds the backend image from the selected backend ref before bootstrapping infra.
+The Weave backend is deployed as `weave-backend` and routed canonically through `api.<tenant_domain>/api`. It is configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. The default local image tag is `weave-backend:local`; set `TF_VAR_weave_backend_image` to a locally built tag or pinned release digest for deterministic validation. The self-hosted live-stack CI path always builds the backend image from the selected backend ref before bootstrapping infra.
 
 The Matrix stack uses Matrix Authentication Service delegated auth through MAS' modern Synapse adapter. Keep the default MAS image unless an override has been checked against the generated `synapse_modern` config and `on_conflict: set` localpart policy. Keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later so MAS can provision and link users through the homeserver MAS API.
 
@@ -162,7 +156,7 @@ bash weave-workspace/release-verify.sh
 bash weave-workspace/operator-check.sh
 ```
 
-with `WEAVE_BASE_URL`, `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_BASE_URL`, and `WEAVE_MATRIX_HOMESERVER_URL` exported from your operator env file. `WEAVE_NEXTCLOUD_URL` and `WEAVE_MATRIX_URL` remain accepted as compatibility aliases in verification scripts.
+with `WEAVE_BASE_URL`, `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_BASE_URL`, and `WEAVE_MATRIX_HOMESERVER_URL` exported from your operator env file.
 
 `release-verify.sh` confirms the public Release 1 contract. `operator-check.sh` adds host-local checks for the managed containers plus loopback service health so operators can distinguish public routing failures from service failures.
 
@@ -175,11 +169,6 @@ The stack expects these names to resolve to `127.0.0.1`:
 - `auth.<tenant_domain>`
 - `matrix.<tenant_domain>`
 - `files.<tenant_domain>` for the canonical Nextcloud URL
-
-Compatibility aliases, if used during migration:
-
-- `keycloak.<tenant_domain>` -> `auth.<tenant_domain>`
-- `nextcloud.<tenant_domain>` -> `files.<tenant_domain>`
 
 Default `/etc/hosts` line:
 
@@ -205,7 +194,7 @@ export WEAVE_TEST_USERNAME=test@weave.local
 export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.env>'
 ```
 
-`WEAVE_BASE_URL` must match the canonical Caddy API route under `api.<tenant_domain>/api`; `<tenant_domain>/api` remains a compatibility route only. `WEAVE_OIDC_ISSUER_URL` must match the public Keycloak issuer used in access tokens. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
+`WEAVE_BASE_URL` must match the canonical Caddy API route under `api.<tenant_domain>/api`. `WEAVE_OIDC_ISSUER_URL` must match the public Keycloak issuer used in access tokens. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
 
 The test user is disabled by default. Enable it only for local integration testing and smoke validation:
 
@@ -240,7 +229,6 @@ The backend resource server contract is:
 - required audience: `weave-app`
 - expected client ID / authorized party: `weave-app`
 - public readiness endpoint: `https://api.weave.local/api/health/ready`
-- compatibility readiness endpoint: `https://weave.local/api/health/ready`
 - direct health endpoint: `http://127.0.0.1:8084/actuator/health`
 
 See `KEYCLOAK_CONTRACT.md` for the full realm, client, scope, claim, and audience contract.

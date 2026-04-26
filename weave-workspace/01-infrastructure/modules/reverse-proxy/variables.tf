@@ -47,9 +47,3 @@ variable "public_hosts" {
   description = "Public hostnames that should resolve to the reverse proxy on the Docker network."
   type        = map(string)
 }
-
-variable "docker_socket_path" {
-  description = "Deprecated. Retained only for compatibility with older module callers."
-  type        = string
-  default     = null
-}

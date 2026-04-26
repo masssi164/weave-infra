@@ -34,13 +34,11 @@ locals {
   ) ? "" : ":${var.proxy_host_port}"
 
   public_hosts = {
-    weave     = var.tenant_domain
-    api       = "${var.api_subdomain}.${var.tenant_domain}"
-    auth      = "${var.auth_subdomain}.${var.tenant_domain}"
-    keycloak  = "keycloak.${var.tenant_domain}"
-    matrix    = "${var.matrix_subdomain}.${var.tenant_domain}"
-    files     = "${var.nextcloud_subdomain}.${var.tenant_domain}"
-    nextcloud = "nextcloud.${var.tenant_domain}"
+    weave  = var.tenant_domain
+    api    = "${var.api_subdomain}.${var.tenant_domain}"
+    auth   = "${var.auth_subdomain}.${var.tenant_domain}"
+    matrix = "${var.matrix_subdomain}.${var.tenant_domain}"
+    files  = "${var.nextcloud_subdomain}.${var.tenant_domain}"
   }
 
   public_urls = {
@@ -49,13 +47,11 @@ locals {
   }
 
   site_hosts = {
-    weave            = [local.public_hosts.weave]
-    api              = [local.public_hosts.api]
-    auth             = [local.public_hosts.auth]
-    keycloak_compat  = local.public_hosts.keycloak == local.public_hosts.auth ? [] : [local.public_hosts.keycloak]
-    matrix           = [local.public_hosts.matrix]
-    files            = [local.public_hosts.files]
-    nextcloud_compat = local.public_hosts.nextcloud == local.public_hosts.files ? [] : [local.public_hosts.nextcloud]
+    weave  = [local.public_hosts.weave]
+    api    = [local.public_hosts.api]
+    auth   = [local.public_hosts.auth]
+    matrix = [local.public_hosts.matrix]
+    files  = [local.public_hosts.files]
   }
 
   site_addresses = {
@@ -74,20 +70,17 @@ locals {
   caddy_certs_dir     = dirname(local.caddy_tls_cert_file)
   caddyfile_path      = abspath("${path.module}/.generated/caddy/Caddyfile")
   caddyfile_content = templatefile("${path.module}/templates/Caddyfile.tpl", {
-    weave_site_addresses            = local.site_addresses.weave
-    api_site_addresses              = local.site_addresses.api
-    auth_site_addresses             = local.site_addresses.auth
-    keycloak_compat_site_addresses  = local.site_addresses.keycloak_compat
-    files_site_addresses            = local.site_addresses.files
-    nextcloud_compat_site_addresses = local.site_addresses.nextcloud_compat
-    matrix_site_addresses           = local.site_addresses.matrix
-    keycloak_upstream               = "${local.service_names.keycloak}:8080"
-    nextcloud_upstream              = "${local.service_names.nextcloud}:80"
-    auth_public_url                 = local.public_urls.auth
-    nextcloud_public_url            = local.public_urls.files
-    matrix_public_url               = local.public_urls.matrix
-    mas_upstream                    = "${local.service_names.mas}:8080"
-    synapse_upstream                = "${local.service_names.synapse}:8008"
+    weave_site_addresses  = local.site_addresses.weave
+    api_site_addresses    = local.site_addresses.api
+    auth_site_addresses   = local.site_addresses.auth
+    files_site_addresses  = local.site_addresses.files
+    matrix_site_addresses = local.site_addresses.matrix
+    keycloak_upstream     = "${local.service_names.keycloak}:8080"
+    nextcloud_upstream    = "${local.service_names.nextcloud}:80"
+    nextcloud_public_url  = local.public_urls.files
+    matrix_public_url     = local.public_urls.matrix
+    mas_upstream          = "${local.service_names.mas}:8080"
+    synapse_upstream      = "${local.service_names.synapse}:8008"
     # Backend is routed via Caddy (api_upstream); no Traefik labels needed
     api_upstream      = "${local.service_names.backend}:${var.backend_container_port}"
     tls_cert_filename = basename(local.caddy_tls_cert_file)
