@@ -1,11 +1,36 @@
 output "public_hosts" {
-  description = "Browser-facing hostnames reserved by the local stack contract."
+  description = "Browser-facing hostnames reserved by the local stack contract, including compatibility aliases."
   value       = local.public_hosts
 }
 
 output "public_urls" {
-  description = "Browser-facing URLs reserved by the local stack contract."
+  description = "Browser-facing URLs reserved by the local stack contract, including compatibility aliases."
   value       = local.public_urls
+}
+
+output "weave_api_base_url" {
+  description = "Canonical public Weave backend API base URL."
+  value       = "${local.public_urls.api}/api"
+}
+
+output "weave_api_compatibility_url" {
+  description = "Temporary product-gateway API compatibility URL."
+  value       = "${local.public_urls.weave}/api"
+}
+
+output "weave_files_product_url" {
+  description = "Weave product files route; not a direct Nextcloud route."
+  value       = "${local.public_urls.weave}/files"
+}
+
+output "weave_calendar_product_url" {
+  description = "Weave product calendar route; not a direct Nextcloud route."
+  value       = "${local.public_urls.weave}/calendar"
+}
+
+output "nextcloud_base_url" {
+  description = "Canonical Nextcloud base URL for WebDAV, CalDAV, OCS, OIDC redirects, and fallback/admin UI."
+  value       = local.public_urls.files
 }
 
 output "database_names" {

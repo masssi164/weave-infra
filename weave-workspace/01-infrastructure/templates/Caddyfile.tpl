@@ -26,12 +26,28 @@ ${weave_site_addresses} {
 	}
 }
 
-${keycloak_site_addresses} {
+${api_site_addresses} {
+	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
+	encode zstd gzip
+
+	reverse_proxy ${api_upstream}
+}
+
+${auth_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
 	reverse_proxy ${keycloak_upstream}
 }
+
+%{ if keycloak_compat_site_addresses != "" ~}
+${keycloak_compat_site_addresses} {
+	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
+	encode zstd gzip
+
+	redir ${auth_public_url}{uri} permanent
+}
+%{ endif ~}
 
 ${matrix_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
@@ -65,9 +81,18 @@ ${matrix_site_addresses} {
 	}
 }
 
-${nextcloud_site_addresses} {
+${files_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
 	reverse_proxy ${nextcloud_upstream}
 }
+
+%{ if nextcloud_compat_site_addresses != "" ~}
+${nextcloud_compat_site_addresses} {
+	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
+	encode zstd gzip
+
+	redir ${nextcloud_public_url}{uri} permanent
+}
+%{ endif ~}

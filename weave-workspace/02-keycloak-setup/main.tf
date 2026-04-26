@@ -25,9 +25,12 @@ locals {
 
   public_hosts = {
     weave     = var.tenant_domain
-    keycloak  = "${var.auth_subdomain}.${var.tenant_domain}"
+    api       = "${var.api_subdomain}.${var.tenant_domain}"
+    auth      = "${var.auth_subdomain}.${var.tenant_domain}"
+    keycloak  = "keycloak.${var.tenant_domain}"
     matrix    = "${var.matrix_subdomain}.${var.tenant_domain}"
-    nextcloud = "${var.nextcloud_subdomain}.${var.tenant_domain}"
+    files     = "${var.nextcloud_subdomain}.${var.tenant_domain}"
+    nextcloud = "nextcloud.${var.tenant_domain}"
   }
 
   public_urls = {
@@ -42,9 +45,9 @@ module "tenant_identity" {
   source = "./modules/tenant-identity"
 
   tenant_slug              = var.tenant_slug
-  keycloak_public_url      = local.public_urls.keycloak
+  keycloak_public_url      = local.public_urls.auth
   mas_public_url           = local.public_urls.matrix
-  nextcloud_public_url     = local.public_urls.nextcloud
+  nextcloud_public_url     = local.public_urls.files
   matrix_mas_upstream_id   = local.matrix_mas_upstream_id
   matrix_mas_client_secret = var.matrix_mas_client_secret
   create_test_user         = var.create_test_user

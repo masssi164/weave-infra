@@ -54,6 +54,10 @@ product_public_url() {
     "$(public_port_suffix)"
 }
 
+api_public_url() {
+  public_url "${TF_VAR_api_subdomain:-api}"
+}
+
 curl_common_args() {
   local -a args=(--silent --show-error --fail)
 
@@ -107,7 +111,7 @@ require_command docker
 require_command jq
 load_bootstrap_env
 
-: "${WEAVE_BASE_URL:=$(product_public_url)/api}"
+: "${WEAVE_BASE_URL:=$(api_public_url)/api}"
 : "${WEAVE_OIDC_ISSUER_URL:=$(public_url "${TF_VAR_auth_subdomain:-auth}")/realms/${TF_VAR_tenant_slug:-weave}}"
 : "${WEAVE_NEXTCLOUD_BASE_URL:=${WEAVE_NEXTCLOUD_URL:-$(public_url "${TF_VAR_nextcloud_subdomain:-files}")}}"
 : "${WEAVE_MATRIX_HOMESERVER_URL:=${WEAVE_MATRIX_URL:-$(public_url "${TF_VAR_matrix_subdomain:-matrix}")}}"

@@ -70,6 +70,13 @@ public_url() {
     "$(public_port_suffix)"
 }
 
+product_public_url() {
+  printf '%s://%s%s' \
+    "${TF_VAR_public_scheme:-https}" \
+    "${TF_VAR_tenant_domain:?Expected TF_VAR_tenant_domain in env or bootstrap env}" \
+    "$(public_port_suffix)"
+}
+
 host_port_from_url() {
   local url="$1"
   local host_port
@@ -165,8 +172,8 @@ load_bootstrap_env
 CADDY_TLS_CA_FILE="${TF_VAR_caddy_tls_ca_file:-${DEFAULT_CADDY_TLS_CA_FILE}}"
 [[ -f "${CADDY_TLS_CA_FILE}" ]] || fail "Expected a trusted Caddy TLS CA file at ${CADDY_TLS_CA_FILE}. Set TF_VAR_caddy_tls_ca_file explicitly or run install.sh first."
 
-: "${WEAVE_BASE_URL:?Expected WEAVE_BASE_URL in env or bootstrap env}"
-: "${WEAVE_OIDC_ISSUER_URL:?Expected WEAVE_OIDC_ISSUER_URL in env or bootstrap env}"
+WEAVE_BASE_URL="${WEAVE_BASE_URL:-$(public_url "${TF_VAR_api_subdomain:-api}")/api}"
+WEAVE_OIDC_ISSUER_URL="${WEAVE_OIDC_ISSUER_URL:-$(public_url "${TF_VAR_auth_subdomain:-auth}")/realms/${TF_VAR_tenant_slug:-weave}}"
 WEAVE_NEXTCLOUD_BASE_URL="${WEAVE_NEXTCLOUD_BASE_URL:-${WEAVE_NEXTCLOUD_URL:-$(public_url "${TF_VAR_nextcloud_subdomain:-files}")}}"
 WEAVE_MATRIX_HOMESERVER_URL="${WEAVE_MATRIX_HOMESERVER_URL:-${WEAVE_MATRIX_URL:-$(public_url "${TF_VAR_matrix_subdomain:-matrix}")}}"
 : "${WEAVE_OIDC_CLIENT_ID:?Expected WEAVE_OIDC_CLIENT_ID in env or bootstrap env}"
@@ -185,10 +192,20 @@ token_endpoint="$(jq -r '.token_endpoint' <<<"${issuer_config}")"
 log "Checking public backend health..."
 backend_health="$(curl_json "${WEAVE_BASE_URL}/health/ready")"
 assert_json "${backend_health}" '.status == "up"' "Backend readiness should report up"
+compat_backend_health="$(curl_json "$(product_public_url)/api/health/ready")"
+assert_json "${compat_backend_health}" '.status == "up"' "Product gateway /api compatibility route should report backend readiness"
+
+log "Checking product shell routes..."
+product_status="$(curl_status "$(product_public_url)/")"
+[[ "${product_status}" == "200" ]] || fail "Smoke check failed: Weave product gateway should return 200, got ${product_status}"
+files_product_status="$(curl_status "$(product_public_url)/files")"
+[[ "${files_product_status}" == "200" ]] || fail "Smoke check failed: Weave files product route should return 200, got ${files_product_status}"
+calendar_product_status="$(curl_status "$(product_public_url)/calendar")"
+[[ "${calendar_product_status}" == "200" ]] || fail "Smoke check failed: Weave calendar product route should return 200, got ${calendar_product_status}"
 
 log "Checking public platform config..."
 platform_config="$(curl_json "${WEAVE_BASE_URL}/platform/config")"
-assert_json "${platform_config}" '.apiBaseUrl | endswith("/api")' "Platform config should expose the public API route"
+assert_json "${platform_config}" ".apiBaseUrl == \"${WEAVE_BASE_URL}\"" "Platform config should expose the canonical public API route"
 assert_json "${platform_config}" '.authBaseUrl | contains("auth.")' "Platform config should expose the public auth host"
 assert_json "${platform_config}" '.features.chatE2ee == false and .features.matrixFederation == false' "MVP chat security flags should be honest"
 
@@ -221,6 +238,10 @@ assert_json "${nextcloud_providers}" ".discoveryEndpoint == \"${WEAVE_OIDC_ISSUE
 assert_json "${nextcloud_providers}" '.settings.groupProvisioning == true' "Nextcloud group provisioning should remain enabled"
 nextcloud_oidc_redirect="$(curl_location "${WEAVE_NEXTCLOUD_BASE_URL}/apps/user_oidc/login/1")"
 [[ "${nextcloud_oidc_redirect}" == https://auth* ]] || fail "Smoke check failed: Nextcloud OIDC login should redirect to Auth, got '${nextcloud_oidc_redirect}'"
+keycloak_compat_status="$(curl_status "${TF_VAR_public_scheme:-https}://keycloak.${TF_VAR_tenant_domain:-weave.local}$(public_port_suffix)/realms/${TF_VAR_tenant_slug:-weave}")"
+[[ "${keycloak_compat_status}" =~ ^30[18]$ ]] || fail "Smoke check failed: keycloak.weave.local compatibility alias should redirect to Auth, got ${keycloak_compat_status}"
+nextcloud_compat_status="$(curl_status "${TF_VAR_public_scheme:-https}://nextcloud.${TF_VAR_tenant_domain:-weave.local}$(public_port_suffix)/status.php")"
+[[ "${nextcloud_compat_status}" =~ ^30[18]$ ]] || fail "Smoke check failed: nextcloud.weave.local compatibility alias should redirect to files.weave.local, got ${nextcloud_compat_status}"
 
 log "Checking Matrix auth routing and MAS wiring..."
 matrix_base_url="${WEAVE_MATRIX_HOMESERVER_URL}"
