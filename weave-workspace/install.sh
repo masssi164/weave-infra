@@ -707,15 +707,18 @@ configure_nextcloud_oidc() {
   # Nextcloud blocks RFC1918 / local-address targets by default, which breaks discovery in local dev.
   occ config:system:set allow_local_remote_servers --type=bool --value=true
   # user_oidc must validate bearer tokens for direct OCS/WebDAV access from
-  # Weave clients. Without this system flag, Nextcloud's browser login works
-  # but protocol requests fall back to app passwords or fail with 401/403.
+  # Weave clients. The system flag enables Nextcloud OIDC-provider validation
+  # when available; the provider flags enable validation/provisioning for the
+  # external Keycloak provider used by Weave's live stack.
   occ config:system:set user_oidc oidc_provider_bearer_validation --type=boolean --value=true
   occ config:app:set --type=boolean --value="${allow_insecure_http}" user_oidc allow_insecure_http
   occ user_oidc:provider keycloak \
     --clientid="${nextcloud_client_id}" \
     --clientsecret="${nextcloud_client_secret}" \
     --discoveryuri="${issuer_url}/.well-known/openid-configuration" \
-    --group-provisioning=1
+    --group-provisioning=1 \
+    --check-bearer=1 \
+    --bearer-provisioning=1
 }
 
 print_summary() {
