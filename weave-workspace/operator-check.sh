@@ -210,7 +210,7 @@ done
 
 log "Checking loopback health endpoints..."
 assert_http_200 "Keycloak management" "http://127.0.0.1:${TF_VAR_keycloak_management_host_port:-49000}/health/ready"
-assert_http_200 "Weave backend" "http://127.0.0.1:${TF_VAR_backend_host_port:-48084}/actuator/health"
+assert_http_200 "Weave backend" "http://127.0.0.1:${TF_VAR_backend_host_port:-48084}/api/health/ready"
 assert_http_200 "MAS" "http://127.0.0.1:${TF_VAR_mas_host_port:-48082}/health"
 assert_http_200 "Synapse" "http://127.0.0.1:${TF_VAR_synapse_host_port:-48008}/_matrix/client/versions"
 

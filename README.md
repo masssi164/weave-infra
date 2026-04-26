@@ -28,7 +28,7 @@ cd weave-workspace
 
 Run `make dev-hosts` from the repository root to print the default `/etc/hosts` line.
 
-`install.sh` now defaults to a shared-host-safe isolated port block, generates secrets and local TLS certificates when they are not already exported as `TF_VAR_*`, applies both Terraform stages in order, waits for readiness, and bootstraps the Nextcloud `user_oidc` app.
+`install.sh` now defaults to a shared-host-safe isolated port block, runs preflight checks for Docker, host resolution, and likely port conflicts, generates secrets and local TLS certificates when they are not already exported as `TF_VAR_*`, applies both Terraform stages in order, waits for `/api/health/ready`, and bootstraps the Nextcloud `user_oidc` app.
 
 For repeatable local runs, generated bootstrap inputs are persisted in `weave-workspace/.generated/bootstrap.env`, mirrored to the self-hosted runner bootstrap cache when applicable, and reused on subsequent installs unless you override them explicitly with environment variables. The installer also writes a no-secrets app configuration summary to `weave-workspace/.generated/app-config.env`.
 
@@ -156,7 +156,7 @@ bash weave-workspace/release-verify.sh
 bash weave-workspace/operator-check.sh
 ```
 
-with `WEAVE_BASE_URL`, `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_BASE_URL`, and `WEAVE_MATRIX_HOMESERVER_URL` exported from your operator env file.
+with `WEAVE_API_BASE_URL` (or legacy-compatible `WEAVE_BASE_URL`), `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_BASE_URL`, and `WEAVE_MATRIX_HOMESERVER_URL` exported from your operator env file.
 
 `release-verify.sh` confirms the public Release 1 contract. `operator-check.sh` adds host-local checks for the managed containers plus loopback service health so operators can distinguish public routing failures from service failures.
 
@@ -187,6 +187,7 @@ For the Release 1 operator layer, including secrets rotation expectations, backu
 Integration tests should call the backend through the Caddy proxy URL, not the direct backend container port. For the default local stack:
 
 ```bash
+export WEAVE_API_BASE_URL=https://api.weave.local/api
 export WEAVE_BASE_URL=https://api.weave.local/api
 export WEAVE_OIDC_ISSUER_URL=https://auth.weave.local/realms/weave
 export WEAVE_OIDC_CLIENT_ID=weave-app
@@ -194,7 +195,7 @@ export WEAVE_TEST_USERNAME=test@weave.local
 export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.env>'
 ```
 
-`WEAVE_BASE_URL` must match the canonical Caddy API route under `api.<tenant_domain>/api`. `WEAVE_OIDC_ISSUER_URL` must match the public Keycloak issuer used in access tokens. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
+`WEAVE_API_BASE_URL` (mirrored as legacy-compatible `WEAVE_BASE_URL`) must match the canonical Caddy API route under `api.<tenant_domain>/api`. `WEAVE_OIDC_ISSUER_URL` must match the public Keycloak issuer used in access tokens. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
 
 For local app/runtime configuration without secrets, source or inspect `weave-workspace/.generated/app-config.env`. It includes the product gateway, backend API, auth issuer, Matrix homeserver, Weave product files/calendar routes, and a clearly labeled `WEAVE_NEXTCLOUD_TECHNICAL_BASE_URL` for raw Nextcloud admin/protocol fallback only. It intentionally omits the backend-owned Nextcloud actor token; use the private `weave-workspace/.generated/bootstrap.env` only for local backend/server-side runs that need those secrets.
 
@@ -231,6 +232,6 @@ The backend resource server contract is:
 - required audience: `weave-app`
 - expected client ID / authorized party: `weave-app`
 - public readiness endpoint: `https://api.weave.local/api/health/ready`
-- direct health endpoint: `http://127.0.0.1:8084/actuator/health`
+- direct readiness endpoint: `http://127.0.0.1:8084/api/health/ready`
 
 See `KEYCLOAK_CONTRACT.md` for the full realm, client, scope, claim, and audience contract.

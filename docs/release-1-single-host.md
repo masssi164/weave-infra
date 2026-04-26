@@ -112,7 +112,7 @@ What matters is that the choice is explicit and tested.
 
 Use `weave-workspace/release-verify.sh` with:
 
-- `WEAVE_BASE_URL`
+- `WEAVE_API_BASE_URL` (or legacy-compatible `WEAVE_BASE_URL`)
 - `WEAVE_PUBLIC_BASE_URL`
 - `WEAVE_OIDC_ISSUER_URL`
 - `WEAVE_NEXTCLOUD_BASE_URL`
@@ -123,7 +123,7 @@ The script checks:
 
 - Keycloak discovery on the public issuer URL
 - Weave product gateway plus `/files` and `/calendar` product routes when `WEAVE_PUBLIC_BASE_URL` is set
-- backend health through the public API origin
+- backend readiness through the canonical public API base at `/api/health/ready`
 - Nextcloud install status through the raw technical/admin/protocol fallback files origin
 - backend-owned Nextcloud actor env on `weave-backend`, plus the matching Nextcloud user
 - Matrix delegated auth discovery, client versions, and `/authorize` reachability

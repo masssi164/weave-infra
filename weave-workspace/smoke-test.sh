@@ -281,7 +281,8 @@ load_bootstrap_env
 CADDY_TLS_CA_FILE="${TF_VAR_caddy_tls_ca_file:-${DEFAULT_CADDY_TLS_CA_FILE}}"
 [[ -f "${CADDY_TLS_CA_FILE}" ]] || fail "Expected a trusted Caddy TLS CA file at ${CADDY_TLS_CA_FILE}. Set TF_VAR_caddy_tls_ca_file explicitly or run install.sh first."
 
-WEAVE_BASE_URL="${WEAVE_BASE_URL:-$(public_url "${TF_VAR_api_subdomain:-api}")/api}"
+WEAVE_API_BASE_URL="${WEAVE_API_BASE_URL:-${WEAVE_BASE_URL:-$(public_url "${TF_VAR_api_subdomain:-api}")/api}}"
+WEAVE_BASE_URL="${WEAVE_API_BASE_URL%/}"
 WEAVE_OIDC_ISSUER_URL="${WEAVE_OIDC_ISSUER_URL:-$(public_url "${TF_VAR_auth_subdomain:-auth}")/realms/${TF_VAR_tenant_slug:-weave}}"
 WEAVE_NEXTCLOUD_BASE_URL="${WEAVE_NEXTCLOUD_BASE_URL:-$(public_url "${TF_VAR_nextcloud_subdomain:-files}")}"
 WEAVE_MATRIX_HOMESERVER_URL="${WEAVE_MATRIX_HOMESERVER_URL:-$(public_url "${TF_VAR_matrix_subdomain:-matrix}")}"
