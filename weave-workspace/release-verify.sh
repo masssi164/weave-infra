@@ -73,6 +73,7 @@ assert_json() {
 }
 
 require_command curl
+require_command docker
 require_command jq
 
 : "${WEAVE_BASE_URL:?Expected WEAVE_BASE_URL in env}"
@@ -99,6 +100,10 @@ assert_json "${nextcloud_status}" '.installed == true' "Nextcloud should be inst
 
 nextcloud_bearer_validation="$(docker exec --user www-data weave-nextcloud php occ config:system:get user_oidc oidc_provider_bearer_validation 2>/dev/null || true)"
 [[ "${nextcloud_bearer_validation}" == "true" ]] || fail "Release verification failed: Nextcloud user_oidc bearer validation is not enabled"
+
+nextcloud_oidc_provider="$(docker exec --user www-data weave-nextcloud php occ user_oidc:provider --output=json keycloak)"
+assert_json "${nextcloud_oidc_provider}" '.settings.checkBearer == true or .settings.checkBearer == "1" or .settings.checkBearer == 1' "Nextcloud OIDC provider should validate Bearer tokens"
+assert_json "${nextcloud_oidc_provider}" '.settings.bearerProvisioning == true or .settings.bearerProvisioning == "1" or .settings.bearerProvisioning == 1' "Nextcloud OIDC provider should provision Bearer-token users"
 
 log "Checking Matrix delegated auth discovery..."
 mas_discovery="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/.well-known/openid-configuration")"
