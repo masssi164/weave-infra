@@ -25,7 +25,7 @@ Operators should expose these HTTPS origins:
 - `https://api.<tenant_domain>/api` for the canonical Weave backend API
 - `https://auth.<tenant_domain>`
 - `https://matrix.<tenant_domain>`
-- `https://files.<tenant_domain>` as the canonical Nextcloud URL
+- `https://files.<tenant_domain>` as the raw Nextcloud technical/admin/protocol fallback for WebDAV, CalDAV, OCS, discovery, and admin access
 
 For the current preferred contract, use:
 
@@ -111,6 +111,7 @@ What matters is that the choice is explicit and tested.
 Use `weave-workspace/release-verify.sh` with:
 
 - `WEAVE_BASE_URL`
+- `WEAVE_PUBLIC_BASE_URL`
 - `WEAVE_OIDC_ISSUER_URL`
 - `WEAVE_NEXTCLOUD_BASE_URL`
 - `WEAVE_MATRIX_HOMESERVER_URL`
@@ -119,9 +120,10 @@ Use `weave-workspace/release-verify.sh` with:
 The script checks:
 
 - Keycloak discovery on the public issuer URL
+- Weave product gateway plus `/files` and `/calendar` product routes when `WEAVE_PUBLIC_BASE_URL` is set
 - backend health through the public API origin
-- Nextcloud install status through the public files origin
-- Matrix delegated auth discovery and `/authorize` reachability
+- Nextcloud install status through the raw technical/admin/protocol fallback files origin
+- Matrix delegated auth discovery, client versions, and `/authorize` reachability
 
 ## Operational minimums
 

@@ -55,11 +55,11 @@ curl_json() {
 
 curl_status() {
   local url="$1"
-  local -a args=()
+  local -a args=(--silent --show-error)
 
-  while IFS= read -r -d '' arg; do
-    args+=("${arg}")
-  done < <(curl_common_args)
+  if [[ -n "${WEAVE_TLS_CA_FILE:-}" ]]; then
+    args+=(--cacert "${WEAVE_TLS_CA_FILE}")
+  fi
 
   curl "${args[@]}" -o /dev/null -w '%{http_code}' "$url"
 }
@@ -77,12 +77,25 @@ require_command docker
 require_command jq
 
 : "${WEAVE_BASE_URL:?Expected WEAVE_BASE_URL in env}"
+: "${WEAVE_PUBLIC_BASE_URL:=}"
 : "${WEAVE_OIDC_ISSUER_URL:?Expected WEAVE_OIDC_ISSUER_URL in env}"
 : "${WEAVE_NEXTCLOUD_BASE_URL:?Expected WEAVE_NEXTCLOUD_BASE_URL in env}"
 : "${WEAVE_MATRIX_HOMESERVER_URL:?Expected WEAVE_MATRIX_HOMESERVER_URL in env}"
 
 if [[ -n "${WEAVE_TLS_CA_FILE:-}" ]]; then
   [[ -f "${WEAVE_TLS_CA_FILE}" ]] || fail "WEAVE_TLS_CA_FILE points to a missing file: ${WEAVE_TLS_CA_FILE}"
+fi
+
+if [[ -n "${WEAVE_PUBLIC_BASE_URL}" ]]; then
+  log "Checking Weave product gateway routes..."
+  product_status="$(curl_status "${WEAVE_PUBLIC_BASE_URL}/")"
+  [[ "${product_status}" == "200" ]] || fail "Release verify failed: product gateway returned HTTP ${product_status}"
+
+  files_product_status="$(curl_status "${WEAVE_PUBLIC_BASE_URL}/files")"
+  [[ "${files_product_status}" == "200" ]] || fail "Release verify failed: product files route returned HTTP ${files_product_status}"
+
+  calendar_product_status="$(curl_status "${WEAVE_PUBLIC_BASE_URL}/calendar")"
+  [[ "${calendar_product_status}" == "200" ]] || fail "Release verify failed: product calendar route returned HTTP ${calendar_product_status}"
 fi
 
 log "Checking Keycloak discovery..."
@@ -109,6 +122,9 @@ log "Checking Matrix delegated auth discovery..."
 mas_discovery="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/.well-known/openid-configuration")"
 assert_json "${mas_discovery}" ".issuer == \"${WEAVE_MATRIX_HOMESERVER_URL}/\"" "MAS issuer should match the public Matrix URL"
 assert_json "${mas_discovery}" '.authorization_endpoint | contains("/authorize")' "MAS should expose an authorization endpoint"
+
+matrix_versions="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/_matrix/client/versions")"
+assert_json "${matrix_versions}" '.versions | type == "array"' "Matrix client versions should be served by the public Matrix route"
 
 authorize_status="$(curl_status "${WEAVE_MATRIX_HOMESERVER_URL}/authorize")"
 [[ "${authorize_status}" == "400" ]] || fail "Release verify failed: Matrix authorize endpoint should answer with 400 for an incomplete request"
