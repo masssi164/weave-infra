@@ -377,7 +377,7 @@ module "backend" {
   oidc_jwk_set_uri                 = local.keycloak_jwk_set_uri
   oidc_required_audience           = local.weave_backend_audience
   client_id                        = local.weave_app_client_id
-  healthcheck_path                 = "/actuator/health"
+  healthcheck_path                 = "/api/health/ready"
   depends_on                       = [terraform_data.network_ready, module.keycloak]
 }
 

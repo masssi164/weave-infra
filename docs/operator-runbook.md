@@ -70,7 +70,7 @@ Notes:
 - `install.sh` is the supported apply path for both first install and repeat apply
 - keep `TF_VAR_create_test_user=false` for release environments
 - use pinned images, not `:latest`
-- after a backend image change, verify `/actuator/health` and the backend-owned Nextcloud actor checks through both `release-verify.sh` and `operator-check.sh`
+- after a backend image change, verify `/api/health/ready` and the backend-owned Nextcloud actor checks through both `release-verify.sh` and `operator-check.sh`
 
 ## 4. Routine verification
 
@@ -146,7 +146,7 @@ bash weave-workspace/release-verify.sh
 Escalate quickly when any of these fail:
 
 - Keycloak discovery does not match the public issuer URL
-- backend health is not `UP`
+- backend readiness is not `up`
 - Nextcloud `status.php` is not installed/healthy
 - Matrix delegated auth discovery, client versions, or `/authorize` is unavailable
 

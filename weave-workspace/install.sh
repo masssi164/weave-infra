@@ -199,6 +199,11 @@ persist_bootstrap_env() {
     printf 'export WEAVE_MATRIX_HOMESERVER_URL=%q\n' "${TF_VAR_public_scheme}://$(public_host "${TF_VAR_matrix_subdomain}")$(public_port_suffix)"
     printf 'export WEAVE_OIDC_ISSUER_URL=%q\n' "$(integration_test_oidc_issuer_url)"
     printf 'export WEAVE_OIDC_CLIENT_ID=%q\n' "weave-app"
+    printf 'export WEAVE_TARGET_MOBILE=%q\n' "true"
+    printf 'export WEAVE_TARGET_DESKTOP=%q\n' "true"
+    printf 'export WEAVE_TARGET_WEB=%q\n' "false"
+    printf 'export WEAVE_MATRIX_FEDERATION=%q\n' "disabled"
+    printf 'export WEAVE_CHAT_E2EE=%q\n' "planned-not-enabled"
   } >> "${BOOTSTRAP_ENV_FILE}"
 
   if create_test_user_enabled; then
@@ -443,8 +448,73 @@ write_app_config_summary() {
     printf 'export WEAVE_CALENDAR_PRODUCT_URL=%q\n' "${product_url}/calendar"
     printf 'export WEAVE_NEXTCLOUD_TECHNICAL_BASE_URL=%q\n' "${nextcloud_url}"
     printf 'export WEAVE_NEXTCLOUD_BASE_URL=%q\n' "${nextcloud_url}"
+    printf 'export WEAVE_TARGET_MOBILE=%q\n' "true"
+    printf 'export WEAVE_TARGET_DESKTOP=%q\n' "true"
+    printf 'export WEAVE_TARGET_WEB=%q\n' "false"
+    printf 'export WEAVE_MATRIX_FEDERATION=%q\n' "disabled"
+    printf 'export WEAVE_CHAT_E2EE=%q\n' "planned-not-enabled"
   } > "${APP_CONFIG_ENV_FILE}"
   chmod 0644 "${APP_CONFIG_ENV_FILE}"
+}
+
+preflight_checks() {
+  log "Running preflight checks..."
+
+  if ! docker info >/dev/null 2>&1; then
+    fail "Docker daemon is not reachable. Start Docker Desktop or Docker Engine, then rerun ./install.sh."
+  fi
+
+  local host
+  local unresolved_hosts=()
+  local hosts=(
+    "${TF_VAR_tenant_domain}"
+    "$(public_host "${TF_VAR_api_subdomain}")"
+    "$(public_host "${TF_VAR_auth_subdomain}")"
+    "$(public_host "${TF_VAR_nextcloud_subdomain}")"
+    "$(public_host "${TF_VAR_matrix_subdomain}")"
+  )
+
+  for host in "${hosts[@]}"; do
+    if command -v getent >/dev/null 2>&1; then
+      getent hosts "${host}" >/dev/null 2>&1 && continue
+    fi
+    if command -v dscacheutil >/dev/null 2>&1; then
+      dscacheutil -q host -a name "${host}" >/dev/null 2>&1 && continue
+    fi
+    if command -v getent >/dev/null 2>&1 || command -v dscacheutil >/dev/null 2>&1; then
+      unresolved_hosts+=("${host}")
+    fi
+  done
+
+  if (( ${#unresolved_hosts[@]} > 0 )); then
+    log "Preflight warning: these canonical hosts do not resolve yet: ${unresolved_hosts[*]}"
+    log "Add this /etc/hosts line before opening browser/native-client URLs:"
+    log "127.0.0.1 ${hosts[*]}"
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    local port
+    local ports=(
+      "${TF_VAR_proxy_http_host_port}"
+      "${TF_VAR_proxy_host_port}"
+      "${TF_VAR_keycloak_host_port}"
+      "${TF_VAR_keycloak_management_host_port}"
+      "${TF_VAR_mas_host_port}"
+      "${TF_VAR_synapse_host_port}"
+      "${TF_VAR_nextcloud_host_port}"
+      "${TF_VAR_backend_host_port}"
+    )
+
+    for port in "${ports[@]}"; do
+      if lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; then
+        log "Preflight note: TCP port ${port} is already listening. If this is an existing Weave rerun, this is expected; otherwise stop the conflicting service or choose another TF_VAR_*_host_port."
+      fi
+    done
+  else
+    log "Preflight note: lsof is not installed, so port-conflict detection was skipped."
+  fi
+
+  log "Preflight checks completed."
 }
 
 ensure_generated_directories() {
@@ -834,41 +904,54 @@ ensure_nextcloud_backend_actor() {
 
 print_summary() {
   local suffix
-  local backend_url
-  local issuer_url
-  local nextcloud_url
   local weave_client_id
 
   suffix="$(public_port_suffix)"
-  nextcloud_url="$(nextcloud_public_url)"
-  backend_url="$(integration_test_base_url)"
-  issuer_url="$(integration_test_oidc_issuer_url)"
   weave_client_id="$(terraform_output_raw "${KEYCLOAK_DIR}" weave_app_client_id)"
 
   log
-  log "Add these host entries before using the browser-facing URLs:"
-  log "127.0.0.1 ${TF_VAR_tenant_domain} $(public_host "${TF_VAR_api_subdomain}") $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}")"
+  log "Weave local/dev is ready."
   log
-  log "Trust this local TLS CA certificate on the host before opening browser URLs:"
-  log "${TF_VAR_caddy_tls_ca_file}"
+  log "Public URLs:"
+  log "- App/Admin: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}"
+  log "- API:       $(integration_test_base_url)"
+  log "- Auth:      $(auth_public_url)"
+  log "- Files UX:  $(product_public_url)/files"
+  log "- Calendar:  $(product_public_url)/calendar"
+  log "- Files raw: $(nextcloud_public_url)  (Nextcloud admin/protocol fallback, not normal end-user UX)"
+  log "- Matrix:    ${TF_VAR_public_scheme}://$(public_host "${TF_VAR_matrix_subdomain}")${suffix}"
   log
-  log "Weave app client ID: ${weave_client_id}"
-  log "Weave app sign-in redirect: com.massimotter.weave:/oauthredirect"
-  log "Weave app post-logout redirect: com.massimotter.weave:/logout"
-  log "Keycloak admin user: ${TF_VAR_keycloak_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
-  log "Nextcloud admin user: ${TF_VAR_nextcloud_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
-  log "Nextcloud backend actor user: ${TF_VAR_nextcloud_backend_actor_username} (token stored in ${BOOTSTRAP_ENV_FILE})"
-  log "App config summary (no secrets): ${APP_CONFIG_ENV_FILE}"
-  log "Raw Nextcloud technical/admin/protocol fallback: ${nextcloud_url}"
-  log "Weave product URL: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}"
-  log "Weave product files route: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}/files"
-  log "Weave product calendar route: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}/calendar"
-  log "Weave backend API URL: ${backend_url}"
-  log "Weave backend health: http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/actuator/health"
+  log "App config file (no secrets): ${APP_CONFIG_ENV_FILE}"
+  log "Host entries: 127.0.0.1 ${TF_VAR_tenant_domain} $(public_host "${TF_VAR_api_subdomain}") $(public_host "${TF_VAR_auth_subdomain}") $(public_host "${TF_VAR_nextcloud_subdomain}") $(public_host "${TF_VAR_matrix_subdomain}")"
+  log "Trust this local TLS CA certificate on the host before opening browser/native-client URLs: ${TF_VAR_caddy_tls_ca_file}"
+  log
+  log "MVP feature flags:"
+  log "- Mobile:            enabled"
+  log "- Desktop:           enabled"
+  log "- Browser/Web:       later"
+  log "- Matrix federation: disabled"
+  log "- Chat E2EE:         planned, not enabled"
+  log
+  log "Health checks:"
+  log "- Backend ready: $(integration_test_base_url)/health/ready"
+  log "- Keycloak discovery: $(integration_test_oidc_issuer_url)/.well-known/openid-configuration"
+  log "- Matrix versions: ${TF_VAR_public_scheme}://$(public_host "${TF_VAR_matrix_subdomain}")${suffix}/_matrix/client/versions"
+  log "- Raw Nextcloud: $(nextcloud_public_url)/"
+  log
+  log "Admin credentials (local/dev only):"
+  log "- Keycloak admin user: ${TF_VAR_keycloak_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
+  log "- Nextcloud admin user: ${TF_VAR_nextcloud_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
+  log "- Nextcloud backend actor user: ${TF_VAR_nextcloud_backend_actor_username} (token stored in ${BOOTSTRAP_ENV_FILE})"
+  log "- Weave app client ID: ${weave_client_id}"
+  log
+  log "Next steps:"
+  log "- Open $(product_public_url) or launch the configured native client."
+  log "- Run: TF_VAR_create_test_user=true ./install.sh && ./smoke-test.sh"
+  log "- For diagnostics, run: ./operator-check.sh"
+  log "- Weave backend image: ${TF_VAR_weave_backend_image}"
 
   if create_test_user_enabled; then
-    log "Test user: ${TEST_USER_EMAIL} (password stored in ${BOOTSTRAP_ENV_FILE})"
-    log "Integration test env: WEAVE_BASE_URL=${backend_url} WEAVE_NEXTCLOUD_BASE_URL=${nextcloud_url} WEAVE_MATRIX_HOMESERVER_URL=${TF_VAR_public_scheme}://$(public_host "${TF_VAR_matrix_subdomain}")${suffix} WEAVE_OIDC_ISSUER_URL=${issuer_url} WEAVE_OIDC_CLIENT_ID=${weave_client_id} WEAVE_TEST_USERNAME=${TEST_USER_EMAIL} WEAVE_TEST_PASSWORD=<stored in bootstrap env>"
+    log "- Test user: ${TEST_USER_EMAIL} (password stored in ${BOOTSTRAP_ENV_FILE})"
   fi
 }
 
@@ -881,6 +964,7 @@ main() {
   ensure_generated_directories
   load_persisted_env
   ensure_default_inputs
+  preflight_checks
   maybe_prepare_runner_hygiene
   cleanup_partial_weave_containers
   ensure_docker_provider_inputs
@@ -904,7 +988,7 @@ main() {
   terraform_apply "${KEYCLOAK_DIR}"
 
   log "Waiting for Weave backend readiness..."
-  wait_for_http_200 "Weave backend" "http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/actuator/health"
+  wait_for_http_200 "Weave backend" "http://${LOOPBACK_HOST}:${TF_VAR_backend_host_port}/api/health/ready"
 
   log "Waiting for Matrix Authentication Service readiness..."
   wait_for_http_200 "Matrix Authentication Service" "http://${LOOPBACK_HOST}:${TF_VAR_mas_host_port}/health"

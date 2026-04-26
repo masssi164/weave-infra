@@ -143,8 +143,13 @@ require_command curl
 require_command docker
 require_command jq
 
-: "${WEAVE_BASE_URL:?Expected WEAVE_BASE_URL in env}"
+if [[ -z "${WEAVE_API_BASE_URL:-}" ]]; then
+  : "${WEAVE_BASE_URL:?Expected WEAVE_API_BASE_URL or WEAVE_BASE_URL in env}"
+  WEAVE_API_BASE_URL="${WEAVE_BASE_URL%/}"
+fi
+WEAVE_BASE_URL="${WEAVE_API_BASE_URL%/}"
 : "${WEAVE_PUBLIC_BASE_URL:=}"
+: "${WEAVE_AUTH_BASE_URL:=}"
 : "${WEAVE_OIDC_ISSUER_URL:?Expected WEAVE_OIDC_ISSUER_URL in env}"
 : "${WEAVE_NEXTCLOUD_BASE_URL:?Expected WEAVE_NEXTCLOUD_BASE_URL in env}"
 : "${WEAVE_MATRIX_HOMESERVER_URL:?Expected WEAVE_MATRIX_HOMESERVER_URL in env}"

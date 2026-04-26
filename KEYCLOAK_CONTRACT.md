@@ -40,6 +40,7 @@ export WEAVE_TEST_PASSWORD='<generated — see bootstrap.env>'
 `install.sh` also writes non-secret Flutter integration settings when the test user is enabled:
 
 ```bash
+export WEAVE_API_BASE_URL=https://api.weave.local/api
 export WEAVE_BASE_URL=https://api.weave.local/api
 export WEAVE_OIDC_ISSUER_URL=https://auth.weave.local/realms/weave
 export WEAVE_OIDC_CLIENT_ID=weave-app
@@ -73,7 +74,7 @@ The Flutter app may request `openid profile email`; `weave:workspace` is assigne
   - `WEAVE_OIDC_REQUIRED_AUDIENCE=weave-app`
   - `WEAVE_CLIENT_ID=weave-app`
 - Public API URL: `https://api.weave.local/api`
-- Direct health URL: `http://127.0.0.1:8084/actuator/health`
+- Direct readiness URL: `http://127.0.0.1:8084/api/health/ready`
 
 ### Matrix Authentication Service
 

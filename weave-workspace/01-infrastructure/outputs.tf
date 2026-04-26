@@ -33,6 +33,27 @@ output "nextcloud_backend_actor_username" {
   value       = var.nextcloud_backend_actor_username
 }
 
+
+output "app_config" {
+  description = "No-secret public endpoint contract for Weave native clients and local tests."
+  value = {
+    WEAVE_PUBLIC_BASE_URL       = local.public_urls.weave
+    WEAVE_API_ORIGIN            = local.public_urls.api
+    WEAVE_API_BASE_URL          = "${local.public_urls.api}/api"
+    WEAVE_AUTH_BASE_URL         = local.public_urls.auth
+    WEAVE_OIDC_ISSUER_URL       = local.keycloak_issuer_url
+    WEAVE_MATRIX_HOMESERVER_URL = local.public_urls.matrix
+    WEAVE_FILES_PRODUCT_URL     = "${local.public_urls.weave}/files"
+    WEAVE_CALENDAR_PRODUCT_URL  = "${local.public_urls.weave}/calendar"
+    WEAVE_NEXTCLOUD_BASE_URL    = local.public_urls.files
+    WEAVE_TARGET_MOBILE         = "true"
+    WEAVE_TARGET_DESKTOP        = "true"
+    WEAVE_TARGET_WEB            = "false"
+    WEAVE_MATRIX_FEDERATION     = "disabled"
+    WEAVE_CHAT_E2EE             = "planned-not-enabled"
+  }
+}
+
 output "database_names" {
   description = "Runtime PostgreSQL database name used by each service inside the shared PostgreSQL instance."
   value = {
