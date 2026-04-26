@@ -21,7 +21,8 @@ Services on the host:
 
 Operators should expose these HTTPS origins:
 
-- `https://<tenant_domain>` for the Weave product gateway and `/api`, `/files`, `/calendar` routes
+- `https://<tenant_domain>` for the Weave product gateway plus `/files` and `/calendar` product routes
+- `https://api.<tenant_domain>/api` for the canonical Weave backend API
 - `https://auth.<tenant_domain>`
 - `https://matrix.<tenant_domain>`
 - `https://files.<tenant_domain>` as the canonical Nextcloud URL
@@ -29,11 +30,12 @@ Operators should expose these HTTPS origins:
 For the current preferred contract, use:
 
 - `https://weave.example`
+- `https://api.weave.example/api`
 - `https://auth.weave.example`
 - `https://matrix.weave.example`
 - `https://files.weave.example`
 
-Older `keycloak`, `nextcloud`, or `api` subdomains are compatibility aliases only when an operator intentionally preserves them. Pick one public contract and keep backend, mobile, Caddy, and operator docs aligned.
+Do not expose public aliases for older Keycloak, Nextcloud, or product-gateway API routes. Keep backend, mobile, Caddy, and operator docs aligned to the canonical public contract above.
 
 ## Required operator inputs
 
@@ -41,6 +43,7 @@ Set these explicitly before the first apply:
 
 - `TF_VAR_tenant_domain`
 - `TF_VAR_auth_subdomain`
+- `TF_VAR_api_subdomain`
 - `TF_VAR_matrix_subdomain`
 - `TF_VAR_nextcloud_subdomain`
 - `TF_VAR_public_scheme=https`
@@ -59,7 +62,7 @@ Do not rely on the generated local CA flow outside development.
 
 Recommended pattern:
 
-1. issue a SAN certificate for the four public hostnames
+1. issue a SAN certificate for the five canonical public hostnames
 2. place the cert and key on the host with restrictive permissions
 3. set `TF_VAR_caddy_tls_cert_file` and `TF_VAR_caddy_tls_key_file` to those absolute paths
 4. leave `TF_VAR_caddy_tls_ca_file` unset unless your issuer is private and clients must trust an extra CA
@@ -109,8 +112,8 @@ Use `weave-workspace/release-verify.sh` with:
 
 - `WEAVE_BASE_URL`
 - `WEAVE_OIDC_ISSUER_URL`
-- `WEAVE_NEXTCLOUD_BASE_URL` (`WEAVE_NEXTCLOUD_URL` is accepted as a compatibility alias)
-- `WEAVE_MATRIX_HOMESERVER_URL` (`WEAVE_MATRIX_URL` is accepted as a compatibility alias)
+- `WEAVE_NEXTCLOUD_BASE_URL`
+- `WEAVE_MATRIX_HOMESERVER_URL`
 - optional `WEAVE_TLS_CA_FILE` when a private CA is required
 
 The script checks:

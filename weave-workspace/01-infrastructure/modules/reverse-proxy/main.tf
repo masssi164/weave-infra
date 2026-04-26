@@ -63,7 +63,7 @@ resource "docker_container" "this" {
 
   networks_advanced {
     name    = var.network_name
-    aliases = concat([var.container_name], values(var.public_hosts))
+    aliases = distinct(concat([var.container_name], values(var.public_hosts)))
   }
 
   lifecycle {

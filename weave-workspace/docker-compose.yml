@@ -15,6 +15,7 @@ services:
       weave:
         aliases:
           - ${TF_VAR_tenant_domain:-weave.local}
+          - ${TF_VAR_api_subdomain:-api}.${TF_VAR_tenant_domain:-weave.local}
           - ${TF_VAR_auth_subdomain:-auth}.${TF_VAR_tenant_domain:-weave.local}
           - ${TF_VAR_nextcloud_subdomain:-files}.${TF_VAR_tenant_domain:-weave.local}
           - ${TF_VAR_matrix_subdomain:-matrix}.${TF_VAR_tenant_domain:-weave.local}

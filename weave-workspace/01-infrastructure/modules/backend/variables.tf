@@ -33,6 +33,11 @@ variable "public_base_url" {
   type        = string
 }
 
+variable "api_origin" {
+  description = "Public Weave backend API origin."
+  type        = string
+}
+
 variable "api_base_url" {
   description = "Public Weave backend API base URL."
   type        = string

@@ -34,7 +34,7 @@ variable "nextcloud_subdomain" {
 }
 
 variable "api_subdomain" {
-  description = "Deprecated compatibility input. The backend API is exposed at the product gateway /api path."
+  description = "Subdomain used for the canonical Weave backend API origin."
   type        = string
   default     = "api"
 }

@@ -6,11 +6,6 @@ ${weave_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
-	@api path /api /api/*
-	handle @api {
-		reverse_proxy ${api_upstream}
-	}
-
 	@files path /files /files/*
 	handle @files {
 		respond "Weave files product route. Canonical Nextcloud URL: ${nextcloud_public_url}" 200
@@ -26,7 +21,14 @@ ${weave_site_addresses} {
 	}
 }
 
-${keycloak_site_addresses} {
+${api_site_addresses} {
+	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
+	encode zstd gzip
+
+	reverse_proxy ${api_upstream}
+}
+
+${auth_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
@@ -65,7 +67,7 @@ ${matrix_site_addresses} {
 	}
 }
 
-${nextcloud_site_addresses} {
+${files_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 

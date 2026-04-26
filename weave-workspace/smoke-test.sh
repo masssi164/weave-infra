@@ -70,6 +70,13 @@ public_url() {
     "$(public_port_suffix)"
 }
 
+product_public_url() {
+  printf '%s://%s%s' \
+    "${TF_VAR_public_scheme:-https}" \
+    "${TF_VAR_tenant_domain:?Expected TF_VAR_tenant_domain in env or bootstrap env}" \
+    "$(public_port_suffix)"
+}
+
 host_port_from_url() {
   local url="$1"
   local host_port
@@ -165,10 +172,10 @@ load_bootstrap_env
 CADDY_TLS_CA_FILE="${TF_VAR_caddy_tls_ca_file:-${DEFAULT_CADDY_TLS_CA_FILE}}"
 [[ -f "${CADDY_TLS_CA_FILE}" ]] || fail "Expected a trusted Caddy TLS CA file at ${CADDY_TLS_CA_FILE}. Set TF_VAR_caddy_tls_ca_file explicitly or run install.sh first."
 
-: "${WEAVE_BASE_URL:?Expected WEAVE_BASE_URL in env or bootstrap env}"
-: "${WEAVE_OIDC_ISSUER_URL:?Expected WEAVE_OIDC_ISSUER_URL in env or bootstrap env}"
-WEAVE_NEXTCLOUD_BASE_URL="${WEAVE_NEXTCLOUD_BASE_URL:-${WEAVE_NEXTCLOUD_URL:-$(public_url "${TF_VAR_nextcloud_subdomain:-files}")}}"
-WEAVE_MATRIX_HOMESERVER_URL="${WEAVE_MATRIX_HOMESERVER_URL:-${WEAVE_MATRIX_URL:-$(public_url "${TF_VAR_matrix_subdomain:-matrix}")}}"
+WEAVE_BASE_URL="${WEAVE_BASE_URL:-$(public_url "${TF_VAR_api_subdomain:-api}")/api}"
+WEAVE_OIDC_ISSUER_URL="${WEAVE_OIDC_ISSUER_URL:-$(public_url "${TF_VAR_auth_subdomain:-auth}")/realms/${TF_VAR_tenant_slug:-weave}}"
+WEAVE_NEXTCLOUD_BASE_URL="${WEAVE_NEXTCLOUD_BASE_URL:-$(public_url "${TF_VAR_nextcloud_subdomain:-files}")}"
+WEAVE_MATRIX_HOMESERVER_URL="${WEAVE_MATRIX_HOMESERVER_URL:-$(public_url "${TF_VAR_matrix_subdomain:-matrix}")}"
 : "${WEAVE_OIDC_CLIENT_ID:?Expected WEAVE_OIDC_CLIENT_ID in env or bootstrap env}"
 : "${WEAVE_NEXTCLOUD_BASE_URL:?Expected WEAVE_NEXTCLOUD_BASE_URL in env or bootstrap env}"
 : "${WEAVE_MATRIX_HOMESERVER_URL:?Expected WEAVE_MATRIX_HOMESERVER_URL in env or bootstrap env}"
@@ -186,9 +193,17 @@ log "Checking public backend health..."
 backend_health="$(curl_json "${WEAVE_BASE_URL}/health/ready")"
 assert_json "${backend_health}" '.status == "up"' "Backend readiness should report up"
 
+log "Checking product shell routes..."
+product_status="$(curl_status "$(product_public_url)/")"
+[[ "${product_status}" == "200" ]] || fail "Smoke check failed: Weave product gateway should return 200, got ${product_status}"
+files_product_status="$(curl_status "$(product_public_url)/files")"
+[[ "${files_product_status}" == "200" ]] || fail "Smoke check failed: Weave files product route should return 200, got ${files_product_status}"
+calendar_product_status="$(curl_status "$(product_public_url)/calendar")"
+[[ "${calendar_product_status}" == "200" ]] || fail "Smoke check failed: Weave calendar product route should return 200, got ${calendar_product_status}"
+
 log "Checking public platform config..."
 platform_config="$(curl_json "${WEAVE_BASE_URL}/platform/config")"
-assert_json "${platform_config}" '.apiBaseUrl | endswith("/api")' "Platform config should expose the public API route"
+assert_json "${platform_config}" ".apiBaseUrl == \"${WEAVE_BASE_URL}\"" "Platform config should expose the canonical public API route"
 assert_json "${platform_config}" '.authBaseUrl | contains("auth.")' "Platform config should expose the public auth host"
 assert_json "${platform_config}" '.features.chatE2ee == false and .features.matrixFederation == false' "MVP chat security flags should be honest"
 

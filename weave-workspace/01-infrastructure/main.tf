@@ -34,15 +34,31 @@ locals {
   ) ? "" : ":${var.proxy_host_port}"
 
   public_hosts = {
-    weave     = var.tenant_domain
-    keycloak  = "${var.auth_subdomain}.${var.tenant_domain}"
-    matrix    = "${var.matrix_subdomain}.${var.tenant_domain}"
-    nextcloud = "${var.nextcloud_subdomain}.${var.tenant_domain}"
+    weave  = var.tenant_domain
+    api    = "${var.api_subdomain}.${var.tenant_domain}"
+    auth   = "${var.auth_subdomain}.${var.tenant_domain}"
+    matrix = "${var.matrix_subdomain}.${var.tenant_domain}"
+    files  = "${var.nextcloud_subdomain}.${var.tenant_domain}"
   }
 
   public_urls = {
     for service, host in local.public_hosts :
     service => "${var.public_scheme}://${host}${local.public_port_suffix}"
+  }
+
+  site_hosts = {
+    weave  = [local.public_hosts.weave]
+    api    = [local.public_hosts.api]
+    auth   = [local.public_hosts.auth]
+    matrix = [local.public_hosts.matrix]
+    files  = [local.public_hosts.files]
+  }
+
+  site_addresses = {
+    for service, hosts in local.site_hosts :
+    service => join(", ", flatten([
+      for host in hosts : local.public_port_suffix == "" ? ["https://${host}"] : ["https://${host}", "https://${host}${local.public_port_suffix}"]
+    ]))
   }
 
   matrix_mas_upstream_id = "01JQ7N9R4QK6W3M5X8Y2ZC1DHF"
@@ -54,16 +70,17 @@ locals {
   caddy_certs_dir     = dirname(local.caddy_tls_cert_file)
   caddyfile_path      = abspath("${path.module}/.generated/caddy/Caddyfile")
   caddyfile_content = templatefile("${path.module}/templates/Caddyfile.tpl", {
-    weave_site_addresses     = local.public_port_suffix == "" ? "https://${local.public_hosts.weave}" : "https://${local.public_hosts.weave}, https://${local.public_hosts.weave}${local.public_port_suffix}"
-    keycloak_site_addresses  = local.public_port_suffix == "" ? "https://${local.public_hosts.keycloak}" : "https://${local.public_hosts.keycloak}, https://${local.public_hosts.keycloak}${local.public_port_suffix}"
-    nextcloud_site_addresses = local.public_port_suffix == "" ? "https://${local.public_hosts.nextcloud}" : "https://${local.public_hosts.nextcloud}, https://${local.public_hosts.nextcloud}${local.public_port_suffix}"
-    matrix_site_addresses    = local.public_port_suffix == "" ? "https://${local.public_hosts.matrix}" : "https://${local.public_hosts.matrix}, https://${local.public_hosts.matrix}${local.public_port_suffix}"
-    keycloak_upstream        = "${local.service_names.keycloak}:8080"
-    nextcloud_upstream       = "${local.service_names.nextcloud}:80"
-    nextcloud_public_url     = local.public_urls.nextcloud
-    matrix_public_url        = local.public_urls.matrix
-    mas_upstream             = "${local.service_names.mas}:8080"
-    synapse_upstream         = "${local.service_names.synapse}:8008"
+    weave_site_addresses  = local.site_addresses.weave
+    api_site_addresses    = local.site_addresses.api
+    auth_site_addresses   = local.site_addresses.auth
+    files_site_addresses  = local.site_addresses.files
+    matrix_site_addresses = local.site_addresses.matrix
+    keycloak_upstream     = "${local.service_names.keycloak}:8080"
+    nextcloud_upstream    = "${local.service_names.nextcloud}:80"
+    nextcloud_public_url  = local.public_urls.files
+    matrix_public_url     = local.public_urls.matrix
+    mas_upstream          = "${local.service_names.mas}:8080"
+    synapse_upstream      = "${local.service_names.synapse}:8008"
     # Backend is routed via Caddy (api_upstream); no Traefik labels needed
     api_upstream      = "${local.service_names.backend}:${var.backend_container_port}"
     tls_cert_filename = basename(local.caddy_tls_cert_file)
@@ -71,7 +88,7 @@ locals {
   })
 
   # Backend / Keycloak contract: validate public iss values while fetching JWKS over the Docker network.
-  keycloak_issuer_url    = "${local.public_urls.keycloak}/realms/${var.tenant_slug}"
+  keycloak_issuer_url    = "${local.public_urls.auth}/realms/${var.tenant_slug}"
   keycloak_jwk_set_uri   = "http://${local.service_names.keycloak}:8080/realms/${var.tenant_slug}/protocol/openid-connect/certs"
   weave_app_client_id    = "weave-app"
   weave_backend_audience = local.weave_app_client_id
@@ -174,7 +191,7 @@ generated_files = {
       encryption_secret      = var.mas_encryption_secret
       signing_key_kid        = "mas-default"
       upstream_provider_id   = local.matrix_mas_upstream_id
-      upstream_issuer        = "${local.public_urls.keycloak}/realms/${var.tenant_slug}"
+      upstream_issuer        = "${local.public_urls.auth}/realms/${var.tenant_slug}"
       upstream_client_id     = "matrix-mas"
       upstream_client_secret = var.matrix_mas_client_secret
       keycloak_human_name    = "Keycloak"
@@ -312,7 +329,7 @@ module "keycloak" {
   volume_name          = "weave_keycloak_data"
   host_port            = var.keycloak_host_port
   management_host_port = var.keycloak_management_host_port
-  public_url           = local.public_urls.keycloak
+  public_url           = local.public_urls.auth
   db_host              = module.postgres.container_name
   db_port              = 5432
   db_name              = local.service_databases.keycloak.database_name
@@ -332,14 +349,15 @@ module "backend" {
   image_name             = var.weave_backend_image
   host_port              = var.backend_host_port
   container_port         = var.backend_container_port
-  public_host            = local.public_hosts.weave
+  public_host            = local.public_hosts.api
   public_base_url        = local.public_urls.weave
-  api_base_url           = "${local.public_urls.weave}/api"
-  auth_base_url          = local.public_urls.keycloak
+  api_origin             = local.public_urls.api
+  api_base_url           = "${local.public_urls.api}/api"
+  auth_base_url          = local.public_urls.auth
   matrix_base_url        = local.public_urls.matrix
   files_product_url      = "${local.public_urls.weave}/files"
   calendar_product_url   = "${local.public_urls.weave}/calendar"
-  nextcloud_base_url     = local.public_urls.nextcloud
+  nextcloud_base_url     = local.public_urls.files
   oidc_issuer_uri        = local.keycloak_issuer_url
   oidc_jwk_set_uri       = local.keycloak_jwk_set_uri
   oidc_required_audience = local.weave_backend_audience
@@ -381,8 +399,8 @@ module "nextcloud" {
   image_name         = var.nextcloud_image
   volume_name        = "weave_nextcloud_data"
   host_port          = var.nextcloud_host_port
-  public_host        = local.public_hosts.nextcloud
-  public_url         = local.public_urls.nextcloud
+  public_host        = local.public_hosts.files
+  public_url         = local.public_urls.files
   public_scheme      = var.public_scheme
   public_port_suffix = local.public_port_suffix
   trusted_proxies    = var.nextcloud_trusted_proxies
