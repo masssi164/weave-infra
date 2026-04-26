@@ -706,6 +706,10 @@ configure_nextcloud_oidc() {
   # The OIDC provider is reached via the local reverse proxy hostname on the Docker network.
   # Nextcloud blocks RFC1918 / local-address targets by default, which breaks discovery in local dev.
   occ config:system:set allow_local_remote_servers --type=bool --value=true
+  # user_oidc must validate bearer tokens for direct OCS/WebDAV access from
+  # Weave clients. Without this system flag, Nextcloud's browser login works
+  # but protocol requests fall back to app passwords or fail with 401/403.
+  occ config:system:set user_oidc oidc_provider_bearer_validation --type=boolean --value=true
   occ config:app:set --type=boolean --value="${allow_insecure_http}" user_oidc allow_insecure_http
   occ user_oidc:provider keycloak \
     --clientid="${nextcloud_client_id}" \

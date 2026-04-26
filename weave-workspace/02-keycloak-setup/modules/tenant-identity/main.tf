@@ -154,6 +154,15 @@ resource "keycloak_openid_audience_protocol_mapper" "weave_backend_audience" {
   add_to_access_token      = true
 }
 
+resource "keycloak_openid_audience_protocol_mapper" "nextcloud_bearer_audience" {
+  realm_id                 = keycloak_realm.tenant.id
+  client_scope_id          = keycloak_openid_client_scope.weave_workspace.id
+  name                     = "nextcloud-bearer-audience"
+  included_client_audience = keycloak_openid_client.client["nextcloud"].client_id
+  add_to_id_token          = true
+  add_to_access_token      = true
+}
+
 resource "keycloak_openid_client_optional_scopes" "weave_app" {
   realm_id  = keycloak_realm.tenant.id
   client_id = keycloak_openid_client.client["weave_app"].id

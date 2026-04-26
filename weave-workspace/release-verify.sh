@@ -97,6 +97,9 @@ log "Checking Nextcloud public status..."
 nextcloud_status="$(curl_json "${WEAVE_NEXTCLOUD_BASE_URL}/status.php")"
 assert_json "${nextcloud_status}" '.installed == true' "Nextcloud should be installed"
 
+nextcloud_bearer_validation="$(docker exec --user www-data weave-nextcloud php occ config:system:get user_oidc oidc_provider_bearer_validation 2>/dev/null || true)"
+[[ "${nextcloud_bearer_validation}" == "true" ]] || fail "Release verification failed: Nextcloud user_oidc bearer validation is not enabled"
+
 log "Checking Matrix delegated auth discovery..."
 mas_discovery="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/.well-known/openid-configuration")"
 assert_json "${mas_discovery}" ".issuer == \"${WEAVE_MATRIX_HOMESERVER_URL}/\"" "MAS issuer should match the public Matrix URL"
