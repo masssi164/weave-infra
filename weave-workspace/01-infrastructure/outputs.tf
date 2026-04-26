@@ -28,6 +28,11 @@ output "nextcloud_base_url" {
   value       = local.public_urls.files
 }
 
+output "nextcloud_backend_actor_username" {
+  description = "Backend-owned Nextcloud service account username configured for local/dev files and calendar facades."
+  value       = var.nextcloud_backend_actor_username
+}
+
 output "database_names" {
   description = "Runtime PostgreSQL database name used by each service inside the shared PostgreSQL instance."
   value = {

@@ -57,6 +57,8 @@ readonly PERSISTED_TF_VARS=(
   TF_VAR_nextcloud_db_password
   TF_VAR_nextcloud_admin_username
   TF_VAR_nextcloud_admin_password
+  TF_VAR_nextcloud_backend_actor_username
+  TF_VAR_nextcloud_backend_actor_token
   TF_VAR_matrix_mas_client_secret
   TF_VAR_mas_encryption_secret
   TF_VAR_mas_signing_key_pem
@@ -184,6 +186,16 @@ persist_bootstrap_env() {
     printf 'export WEAVE_CALENDAR_PRODUCT_URL=%q\n' "$(product_public_url)/calendar"
     printf 'export WEAVE_NEXTCLOUD_BASE_URL=%q\n' "${TF_VAR_public_scheme}://$(public_host "${TF_VAR_nextcloud_subdomain}")$(public_port_suffix)"
     printf 'export WEAVE_NEXTCLOUD_TECHNICAL_BASE_URL=%q\n' "${TF_VAR_public_scheme}://$(public_host "${TF_VAR_nextcloud_subdomain}")$(public_port_suffix)"
+    printf 'export WEAVE_NEXTCLOUD_FILES_ACTOR_MODEL=%q\n' "backend-service-account"
+    printf 'export WEAVE_NEXTCLOUD_FILES_ACTOR_USERNAME=%q\n' "${TF_VAR_nextcloud_backend_actor_username}"
+    printf 'export WEAVE_NEXTCLOUD_FILES_ACTOR_TOKEN=%q\n' "${TF_VAR_nextcloud_backend_actor_token}"
+    printf 'export WEAVE_NEXTCLOUD_FILES_WEBDAV_ROOT_PATH=%q\n' "/remote.php/dav/files"
+    printf 'export WEAVE_CALDAV_BASE_URL=%q\n' "${TF_VAR_public_scheme}://$(public_host "${TF_VAR_nextcloud_subdomain}")$(public_port_suffix)"
+    printf 'export WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE=%q\n' "/remote.php/dav/calendars/{user}/personal/"
+    printf 'export WEAVE_CALDAV_AUTH_MODE=%q\n' "BASIC"
+    printf 'export WEAVE_CALDAV_BACKEND_USERNAME=%q\n' "${TF_VAR_nextcloud_backend_actor_username}"
+    printf 'export WEAVE_CALDAV_BACKEND_TOKEN=%q\n' "${TF_VAR_nextcloud_backend_actor_token}"
+    printf 'export WEAVE_CALDAV_REQUEST_TIMEOUT_SECONDS=%q\n' "10"
     printf 'export WEAVE_MATRIX_HOMESERVER_URL=%q\n' "${TF_VAR_public_scheme}://$(public_host "${TF_VAR_matrix_subdomain}")$(public_port_suffix)"
     printf 'export WEAVE_OIDC_ISSUER_URL=%q\n' "$(integration_test_oidc_issuer_url)"
     printf 'export WEAVE_OIDC_CLIENT_ID=%q\n' "weave-app"
@@ -522,6 +534,7 @@ ensure_default_inputs() {
     "TF_VAR_synapse_db_username=synapse"
     "TF_VAR_nextcloud_db_username=nextcloud"
     "TF_VAR_nextcloud_admin_username=admin"
+    "TF_VAR_nextcloud_backend_actor_username=weave-backend"
   )
 
   local entry
@@ -549,6 +562,7 @@ ensure_generated_secrets() {
   set_default_secret TF_VAR_synapse_db_password "$(random_base64 24)"
   set_default_secret TF_VAR_nextcloud_db_password "$(random_base64 24)"
   set_default_secret TF_VAR_nextcloud_admin_password "$(random_base64 24)"
+  set_default_secret TF_VAR_nextcloud_backend_actor_token "$(random_base64 24)"
   set_default_secret TF_VAR_matrix_mas_client_secret "$(random_base64 32)"
   set_default_secret TF_VAR_mas_encryption_secret "$(random_hex 32)"
   set_default_secret TF_VAR_mas_matrix_secret "$(random_base64 32)"
@@ -769,6 +783,55 @@ configure_nextcloud_oidc() {
     --bearer-provisioning=1
 }
 
+nextcloud_backend_actor_exists() {
+  occ user:info "${TF_VAR_nextcloud_backend_actor_username}" >/dev/null 2>&1
+}
+
+set_nextcloud_backend_actor_password() {
+  docker exec \
+    --user www-data \
+    -e OC_PASS="${TF_VAR_nextcloud_backend_actor_token}" \
+    weave-nextcloud \
+    php occ user:resetpassword --password-from-env "${TF_VAR_nextcloud_backend_actor_username}" >/dev/null
+}
+
+create_nextcloud_backend_actor() {
+  docker exec \
+    --user www-data \
+    -e OC_PASS="${TF_VAR_nextcloud_backend_actor_token}" \
+    weave-nextcloud \
+    php occ user:add \
+      --password-from-env \
+      --display-name="Weave Backend Service Account" \
+      "${TF_VAR_nextcloud_backend_actor_username}" >/dev/null
+}
+
+ensure_nextcloud_backend_actor_calendar() {
+  if ! occ list --format=txt | grep -q '^  dav:create-calendar'; then
+    log "Nextcloud dav:create-calendar command is unavailable; backend actor calendar pre-creation skipped."
+    return
+  fi
+
+  if occ dav:create-calendar "${TF_VAR_nextcloud_backend_actor_username}" personal >/dev/null 2>&1; then
+    return
+  fi
+
+  log "Nextcloud backend actor calendar already exists or could not be pre-created; continuing with idempotent setup."
+}
+
+ensure_nextcloud_backend_actor() {
+  [[ -n "${TF_VAR_nextcloud_backend_actor_username:-}" ]] || fail "TF_VAR_nextcloud_backend_actor_username must be set."
+  [[ -n "${TF_VAR_nextcloud_backend_actor_token:-}" ]] || fail "TF_VAR_nextcloud_backend_actor_token must be set."
+
+  if nextcloud_backend_actor_exists; then
+    set_nextcloud_backend_actor_password
+  else
+    create_nextcloud_backend_actor
+  fi
+
+  ensure_nextcloud_backend_actor_calendar
+}
+
 print_summary() {
   local suffix
   local backend_url
@@ -794,6 +857,7 @@ print_summary() {
   log "Weave app post-logout redirect: com.massimotter.weave:/logout"
   log "Keycloak admin user: ${TF_VAR_keycloak_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
   log "Nextcloud admin user: ${TF_VAR_nextcloud_admin_username} (password stored in ${BOOTSTRAP_ENV_FILE})"
+  log "Nextcloud backend actor user: ${TF_VAR_nextcloud_backend_actor_username} (token stored in ${BOOTSTRAP_ENV_FILE})"
   log "App config summary (no secrets): ${APP_CONFIG_ENV_FILE}"
   log "Raw Nextcloud technical/admin/protocol fallback: ${nextcloud_url}"
   log "Weave product URL: ${TF_VAR_public_scheme}://${TF_VAR_tenant_domain}${suffix}"
@@ -858,6 +922,9 @@ main() {
 
   log "Configuring Nextcloud OIDC provider..."
   configure_nextcloud_oidc
+
+  log "Ensuring backend-owned Nextcloud actor for files/calendar facades..."
+  ensure_nextcloud_backend_actor
 
   print_summary
 }

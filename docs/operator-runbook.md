@@ -34,6 +34,7 @@ At minimum track ownership and rotation dates for:
 - `TF_VAR_synapse_db_password`
 - `TF_VAR_nextcloud_db_password`
 - `TF_VAR_nextcloud_admin_password`
+- `TF_VAR_nextcloud_backend_actor_token`
 - `TF_VAR_matrix_mas_client_secret`
 - `TF_VAR_mas_encryption_secret`
 - `TF_VAR_mas_signing_key_pem`
@@ -69,7 +70,7 @@ Notes:
 - `install.sh` is the supported apply path for both first install and repeat apply
 - keep `TF_VAR_create_test_user=false` for release environments
 - use pinned images, not `:latest`
-- after a backend image change, verify `/actuator/health` through both `release-verify.sh` and `operator-check.sh`
+- after a backend image change, verify `/actuator/health` and the backend-owned Nextcloud actor checks through both `release-verify.sh` and `operator-check.sh`
 
 ## 4. Routine verification
 
@@ -84,6 +85,7 @@ What `operator-check.sh` adds beyond `release-verify.sh`:
 - confirms the core containers exist and are running
 - checks loopback health endpoints for Keycloak, MAS, Synapse, and backend
 - checks the public product, backend, auth, Matrix, and raw Nextcloud fallback routes through the configured release URLs
+- checks that `weave-backend` has the required server-side Files/Calendar Nextcloud actor env and that the actor user exists in Nextcloud
 
 ## 5. Backup expectations
 

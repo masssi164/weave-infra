@@ -68,6 +68,58 @@ variable "nextcloud_base_url" {
   type        = string
 }
 
+variable "nextcloud_files_actor_model" {
+  description = "Backend-to-Nextcloud actor model used by the files facade."
+  type        = string
+}
+
+variable "nextcloud_files_actor_username" {
+  description = "Backend-owned Nextcloud actor username used by the files facade."
+  type        = string
+}
+
+variable "nextcloud_files_actor_token" {
+  description = "Backend-owned Nextcloud actor app password/token used by the files facade."
+  type        = string
+  sensitive   = true
+}
+
+variable "nextcloud_files_webdav_root_path" {
+  description = "Nextcloud WebDAV files root path consumed by the backend files facade."
+  type        = string
+}
+
+variable "caldav_base_url" {
+  description = "Canonical Nextcloud base URL consumed by the backend CalDAV adapter."
+  type        = string
+}
+
+variable "caldav_calendar_path_template" {
+  description = "CalDAV calendar collection path template consumed by the backend calendar facade."
+  type        = string
+}
+
+variable "caldav_auth_mode" {
+  description = "Backend CalDAV actor authentication mode."
+  type        = string
+}
+
+variable "caldav_backend_username" {
+  description = "Backend-owned Nextcloud actor username used by the CalDAV adapter."
+  type        = string
+}
+
+variable "caldav_backend_token" {
+  description = "Backend-owned Nextcloud actor app password/token used by the CalDAV adapter."
+  type        = string
+  sensitive   = true
+}
+
+variable "caldav_request_timeout_seconds" {
+  description = "Request timeout in seconds for backend CalDAV calls."
+  type        = number
+}
+
 variable "oidc_issuer_uri" {
   description = "OIDC issuer URI consumed by the Weave backend."
   type        = string

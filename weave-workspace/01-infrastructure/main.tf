@@ -344,26 +344,36 @@ module "keycloak" {
 module "backend" {
   source = "./modules/backend"
 
-  network_name           = docker_network.weave_network.name
-  container_name         = local.service_names.backend
-  image_name             = var.weave_backend_image
-  host_port              = var.backend_host_port
-  container_port         = var.backend_container_port
-  public_host            = local.public_hosts.api
-  public_base_url        = local.public_urls.weave
-  api_origin             = local.public_urls.api
-  api_base_url           = "${local.public_urls.api}/api"
-  auth_base_url          = local.public_urls.auth
-  matrix_base_url        = local.public_urls.matrix
-  files_product_url      = "${local.public_urls.weave}/files"
-  calendar_product_url   = "${local.public_urls.weave}/calendar"
-  nextcloud_base_url     = local.public_urls.files
-  oidc_issuer_uri        = local.keycloak_issuer_url
-  oidc_jwk_set_uri       = local.keycloak_jwk_set_uri
-  oidc_required_audience = local.weave_backend_audience
-  client_id              = local.weave_app_client_id
-  healthcheck_path       = "/actuator/health"
-  depends_on             = [terraform_data.network_ready, module.keycloak]
+  network_name                     = docker_network.weave_network.name
+  container_name                   = local.service_names.backend
+  image_name                       = var.weave_backend_image
+  host_port                        = var.backend_host_port
+  container_port                   = var.backend_container_port
+  public_host                      = local.public_hosts.api
+  public_base_url                  = local.public_urls.weave
+  api_origin                       = local.public_urls.api
+  api_base_url                     = "${local.public_urls.api}/api"
+  auth_base_url                    = local.public_urls.auth
+  matrix_base_url                  = local.public_urls.matrix
+  files_product_url                = "${local.public_urls.weave}/files"
+  calendar_product_url             = "${local.public_urls.weave}/calendar"
+  nextcloud_base_url               = local.public_urls.files
+  nextcloud_files_actor_model      = "backend-service-account"
+  nextcloud_files_actor_username   = var.nextcloud_backend_actor_username
+  nextcloud_files_actor_token      = var.nextcloud_backend_actor_token
+  nextcloud_files_webdav_root_path = "/remote.php/dav/files"
+  caldav_base_url                  = local.public_urls.files
+  caldav_calendar_path_template    = "/remote.php/dav/calendars/{user}/personal/"
+  caldav_auth_mode                 = "BASIC"
+  caldav_backend_username          = var.nextcloud_backend_actor_username
+  caldav_backend_token             = var.nextcloud_backend_actor_token
+  caldav_request_timeout_seconds   = 10
+  oidc_issuer_uri                  = local.keycloak_issuer_url
+  oidc_jwk_set_uri                 = local.keycloak_jwk_set_uri
+  oidc_required_audience           = local.weave_backend_audience
+  client_id                        = local.weave_app_client_id
+  healthcheck_path                 = "/actuator/health"
+  depends_on                       = [terraform_data.network_ready, module.keycloak]
 }
 
 module "matrix" {

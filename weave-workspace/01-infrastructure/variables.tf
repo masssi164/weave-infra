@@ -295,6 +295,18 @@ variable "nextcloud_admin_password" {
   sensitive   = true
 }
 
+variable "nextcloud_backend_actor_username" {
+  description = "Backend-owned local/dev Nextcloud service account username for files and calendar facade adapters."
+  type        = string
+  default     = "weave-backend"
+}
+
+variable "nextcloud_backend_actor_token" {
+  description = "Backend-owned local/dev Nextcloud service account password/app token for files and calendar facade adapters."
+  type        = string
+  sensitive   = true
+}
+
 variable "matrix_mas_client_secret" {
   description = "Shared confidential client secret for the matrix-mas Keycloak client."
   type        = string
