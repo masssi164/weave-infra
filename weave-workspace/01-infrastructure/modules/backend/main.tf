@@ -32,6 +32,16 @@ resource "docker_container" "this" {
     "WEAVE_CALENDAR_PRODUCT_URL=${var.calendar_product_url}",
     "WEAVE_MATRIX_HOMESERVER_URL=${var.matrix_base_url}",
     "WEAVE_NEXTCLOUD_BASE_URL=${var.nextcloud_base_url}",
+    "WEAVE_NEXTCLOUD_FILES_ACTOR_MODEL=${var.nextcloud_files_actor_model}",
+    "WEAVE_NEXTCLOUD_FILES_ACTOR_USERNAME=${var.nextcloud_files_actor_username}",
+    "WEAVE_NEXTCLOUD_FILES_ACTOR_TOKEN=${var.nextcloud_files_actor_token}",
+    "WEAVE_NEXTCLOUD_FILES_WEBDAV_ROOT_PATH=${var.nextcloud_files_webdav_root_path}",
+    "WEAVE_CALDAV_BASE_URL=${var.caldav_base_url}",
+    "WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE=${var.caldav_calendar_path_template}",
+    "WEAVE_CALDAV_AUTH_MODE=${var.caldav_auth_mode}",
+    "WEAVE_CALDAV_BACKEND_USERNAME=${var.caldav_backend_username}",
+    "WEAVE_CALDAV_BACKEND_TOKEN=${var.caldav_backend_token}",
+    "WEAVE_CALDAV_REQUEST_TIMEOUT_SECONDS=${var.caldav_request_timeout_seconds}",
   ]
 
   ports {

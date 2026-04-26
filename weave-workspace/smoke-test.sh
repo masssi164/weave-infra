@@ -130,6 +130,22 @@ curl_auth_json() {
     "$url"
 }
 
+curl_auth_status_to_file() {
+  local token="$1"
+  local url="$2"
+  local output_file="$3"
+  local host_port
+
+  host_port="$(host_port_from_url "${url}")"
+  curl --silent --show-error \
+    --cacert "${CADDY_TLS_CA_FILE}" \
+    --resolve "${host_port}:127.0.0.1" \
+    -H "Authorization: Bearer ${token}" \
+    -o "${output_file}" \
+    -w '%{http_code}' \
+    "$url"
+}
+
 curl_status() {
   local url="$1"
   local host_port
@@ -162,6 +178,97 @@ assert_json() {
   local description="$3"
 
   jq -e "${jq_filter}" >/dev/null <<<"${json}" || fail "Smoke check failed: ${description}"
+}
+
+container_env_value() {
+  local container="$1"
+  local name="$2"
+
+  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "${container}" 2>/dev/null |
+    awk -v name="${name}" 'index($0, name "=") == 1 { print substr($0, length(name) + 2); found = 1 } END { if (!found) exit 1 }'
+}
+
+assert_backend_env_present() {
+  local name="$1"
+  local value
+
+  value="$(container_env_value weave-backend "${name}" || true)"
+  [[ -n "${value}" ]] || fail "Smoke check failed: weave-backend is missing required ${name} Nextcloud facade configuration"
+}
+
+assert_backend_nextcloud_actor_config() {
+  local actor_username
+  local actor_model
+  local webdav_root
+  local caldav_base_url
+  local caldav_template
+  local caldav_auth_mode
+  local caldav_username
+  local name
+
+  for name in \
+    WEAVE_NEXTCLOUD_BASE_URL \
+    WEAVE_NEXTCLOUD_FILES_ACTOR_MODEL \
+    WEAVE_NEXTCLOUD_FILES_ACTOR_USERNAME \
+    WEAVE_NEXTCLOUD_FILES_ACTOR_TOKEN \
+    WEAVE_NEXTCLOUD_FILES_WEBDAV_ROOT_PATH \
+    WEAVE_CALDAV_BASE_URL \
+    WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE \
+    WEAVE_CALDAV_AUTH_MODE \
+    WEAVE_CALDAV_BACKEND_USERNAME \
+    WEAVE_CALDAV_BACKEND_TOKEN \
+    WEAVE_CALDAV_REQUEST_TIMEOUT_SECONDS; do
+    assert_backend_env_present "${name}"
+  done
+
+  actor_model="$(container_env_value weave-backend WEAVE_NEXTCLOUD_FILES_ACTOR_MODEL)"
+  [[ "${actor_model}" == "backend-service-account" ]] || fail "Smoke check failed: unsupported files actor model ${actor_model}"
+
+  actor_username="$(container_env_value weave-backend WEAVE_NEXTCLOUD_FILES_ACTOR_USERNAME)"
+  caldav_username="$(container_env_value weave-backend WEAVE_CALDAV_BACKEND_USERNAME)"
+  [[ "${actor_username}" == "${caldav_username}" ]] || fail "Smoke check failed: files and calendar adapters should use the same backend-owned Nextcloud actor username"
+
+  webdav_root="$(container_env_value weave-backend WEAVE_NEXTCLOUD_FILES_WEBDAV_ROOT_PATH)"
+  [[ "${webdav_root}" == "/remote.php/dav/files" ]] || fail "Smoke check failed: unexpected files WebDAV root path ${webdav_root}"
+
+  caldav_base_url="$(container_env_value weave-backend WEAVE_CALDAV_BASE_URL)"
+  [[ "${caldav_base_url}" == "${WEAVE_NEXTCLOUD_BASE_URL}" ]] || fail "Smoke check failed: CalDAV base URL should match the canonical Nextcloud base URL"
+
+  caldav_template="$(container_env_value weave-backend WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE)"
+  [[ "${caldav_template}" == *"{user}"* ]] || fail "Smoke check failed: CalDAV calendar path template must contain {user}"
+
+  caldav_auth_mode="$(container_env_value weave-backend WEAVE_CALDAV_AUTH_MODE)"
+  [[ "${caldav_auth_mode}" == "BASIC" || "${caldav_auth_mode}" == "BEARER" ]] || fail "Smoke check failed: unsupported CalDAV auth mode ${caldav_auth_mode}"
+
+  docker exec --user www-data "${NEXTCLOUD_CONTAINER_NAME}" php occ user:info "${actor_username}" >/dev/null 2>&1 || \
+    fail "Smoke check failed: Nextcloud backend actor user is not provisioned"
+
+  if [[ -f "${ROOT_DIR}/.generated/app-config.env" ]]; then
+    ! grep -Eq 'WEAVE_NEXTCLOUD_FILES_ACTOR_TOKEN|WEAVE_CALDAV_BACKEND_TOKEN|TF_VAR_nextcloud_backend_actor_token' "${ROOT_DIR}/.generated/app-config.env" || \
+      fail "Smoke check failed: no-secret app config exposes backend Nextcloud actor secrets"
+  fi
+}
+
+probe_authenticated_facade() {
+  local name="$1"
+  local token="$2"
+  local url="$3"
+  local body_file
+  local status
+
+  body_file="$(mktemp)"
+  status="$(curl_auth_status_to_file "${token}" "${url}" "${body_file}" || true)"
+  if grep -q 'nextcloud-adapter-not-configured' "${body_file}"; then
+    rm -f -- "${body_file}"
+    fail "Smoke check failed: ${name} facade reports missing backend-owned Nextcloud actor configuration"
+  fi
+  rm -f -- "${body_file}"
+
+  if [[ "${status}" == 2* ]]; then
+    log "${name} facade answered HTTP ${status}."
+  else
+    log "${name} facade probe answered HTTP ${status}; actor config is present, but full downstream user/calendar readiness is not gated here."
+  fi
 }
 
 require_command curl
@@ -225,6 +332,11 @@ profile_response="$(curl_auth_json "${access_token}" "${WEAVE_BASE_URL}/me")"
 assert_json "${profile_response}" ".email == \"${WEAVE_TEST_USERNAME}\"" "Backend should accept a valid app token"
 assert_json "${profile_response}" ".audience | index(\"${WEAVE_OIDC_CLIENT_ID}\") != null" "Token audience should include the app client"
 assert_json "${profile_response}" '.userId != null and .username != null' "Backend should expose canonical identity fields"
+
+log "Checking backend files/calendar facade actor wiring..."
+assert_backend_nextcloud_actor_config
+probe_authenticated_facade "Files" "${access_token}" "${WEAVE_BASE_URL}/files"
+probe_authenticated_facade "Calendar" "${access_token}" "${WEAVE_BASE_URL}/calendar/events"
 
 log "Checking Nextcloud OIDC bootstrap..."
 nextcloud_status="$(curl_json "${WEAVE_NEXTCLOUD_BASE_URL}/status.php")"

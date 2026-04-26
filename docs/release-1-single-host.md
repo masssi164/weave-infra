@@ -51,7 +51,9 @@ Set these explicitly before the first apply:
 - `TF_VAR_caddy_tls_key_file`
 - `TF_VAR_caddy_tls_ca_file` only when you use a private CA
 - `TF_VAR_weave_backend_image`
-- all admin, database, and MAS secrets consumed by `install.sh`
+- `TF_VAR_nextcloud_backend_actor_username`
+- `TF_VAR_nextcloud_backend_actor_token` for the server-side backend Files/Calendar Nextcloud actor
+- all admin, database, MAS, and backend actor secrets consumed by `install.sh`
 
 Start from `weave-workspace/release.env.example`, copy it to a local untracked file, then replace every placeholder.
 
@@ -123,6 +125,7 @@ The script checks:
 - Weave product gateway plus `/files` and `/calendar` product routes when `WEAVE_PUBLIC_BASE_URL` is set
 - backend health through the public API origin
 - Nextcloud install status through the raw technical/admin/protocol fallback files origin
+- backend-owned Nextcloud actor env on `weave-backend`, plus the matching Nextcloud user
 - Matrix delegated auth discovery, client versions, and `/authorize` reachability
 
 ## Operational minimums

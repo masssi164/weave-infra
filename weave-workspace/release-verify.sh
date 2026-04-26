@@ -72,6 +72,71 @@ assert_json() {
   jq -e "${jq_filter}" >/dev/null <<<"${json}" || fail "Release verify failed: ${description}"
 }
 
+container_env_value() {
+  local container="$1"
+  local name="$2"
+
+  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "${container}" 2>/dev/null |
+    awk -v name="${name}" 'index($0, name "=") == 1 { print substr($0, length(name) + 2); found = 1 } END { if (!found) exit 1 }'
+}
+
+assert_backend_env_present() {
+  local name="$1"
+  local value
+
+  value="$(container_env_value weave-backend "${name}" || true)"
+  [[ -n "${value}" ]] || fail "Release verify failed: weave-backend is missing required ${name} Nextcloud facade configuration"
+}
+
+assert_backend_nextcloud_actor_config() {
+  local actor_username
+  local actor_model
+  local webdav_root
+  local caldav_base_url
+  local caldav_template
+  local caldav_auth_mode
+  local caldav_username
+  local name
+
+  log "Checking backend-owned Nextcloud actor configuration..."
+  for name in \
+    WEAVE_NEXTCLOUD_BASE_URL \
+    WEAVE_NEXTCLOUD_FILES_ACTOR_MODEL \
+    WEAVE_NEXTCLOUD_FILES_ACTOR_USERNAME \
+    WEAVE_NEXTCLOUD_FILES_ACTOR_TOKEN \
+    WEAVE_NEXTCLOUD_FILES_WEBDAV_ROOT_PATH \
+    WEAVE_CALDAV_BASE_URL \
+    WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE \
+    WEAVE_CALDAV_AUTH_MODE \
+    WEAVE_CALDAV_BACKEND_USERNAME \
+    WEAVE_CALDAV_BACKEND_TOKEN \
+    WEAVE_CALDAV_REQUEST_TIMEOUT_SECONDS; do
+    assert_backend_env_present "${name}"
+  done
+
+  actor_model="$(container_env_value weave-backend WEAVE_NEXTCLOUD_FILES_ACTOR_MODEL)"
+  [[ "${actor_model}" == "backend-service-account" ]] || fail "Release verify failed: unsupported files actor model ${actor_model}"
+
+  actor_username="$(container_env_value weave-backend WEAVE_NEXTCLOUD_FILES_ACTOR_USERNAME)"
+  caldav_username="$(container_env_value weave-backend WEAVE_CALDAV_BACKEND_USERNAME)"
+  [[ "${actor_username}" == "${caldav_username}" ]] || fail "Release verify failed: files and calendar adapters should use the same backend-owned Nextcloud actor username"
+
+  webdav_root="$(container_env_value weave-backend WEAVE_NEXTCLOUD_FILES_WEBDAV_ROOT_PATH)"
+  [[ "${webdav_root}" == "/remote.php/dav/files" ]] || fail "Release verify failed: unexpected files WebDAV root path ${webdav_root}"
+
+  caldav_base_url="$(container_env_value weave-backend WEAVE_CALDAV_BASE_URL)"
+  [[ "${caldav_base_url}" == "${WEAVE_NEXTCLOUD_BASE_URL}" ]] || fail "Release verify failed: CalDAV base URL should match the canonical Nextcloud base URL"
+
+  caldav_template="$(container_env_value weave-backend WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE)"
+  [[ "${caldav_template}" == *"{user}"* ]] || fail "Release verify failed: CalDAV calendar path template must contain {user}"
+
+  caldav_auth_mode="$(container_env_value weave-backend WEAVE_CALDAV_AUTH_MODE)"
+  [[ "${caldav_auth_mode}" == "BASIC" || "${caldav_auth_mode}" == "BEARER" ]] || fail "Release verify failed: unsupported CalDAV auth mode ${caldav_auth_mode}"
+
+  docker exec --user www-data weave-nextcloud php occ user:info "${actor_username}" >/dev/null 2>&1 || \
+    fail "Release verify failed: Nextcloud backend actor user is not provisioned"
+}
+
 require_command curl
 require_command docker
 require_command jq
@@ -110,6 +175,8 @@ assert_json "${backend_health}" '.status == "up"' "backend readiness should repo
 log "Checking Nextcloud public status..."
 nextcloud_status="$(curl_json "${WEAVE_NEXTCLOUD_BASE_URL}/status.php")"
 assert_json "${nextcloud_status}" '.installed == true' "Nextcloud should be installed"
+
+assert_backend_nextcloud_actor_config
 
 nextcloud_bearer_validation="$(docker exec --user www-data weave-nextcloud php occ config:system:get user_oidc oidc_provider_bearer_validation 2>/dev/null || true)"
 [[ "${nextcloud_bearer_validation}" == "true" ]] || fail "Release verification failed: Nextcloud user_oidc bearer validation is not enabled"

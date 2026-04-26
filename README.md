@@ -118,7 +118,7 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>_synapse`
 - `<db_name>` (Nextcloud stores its tables in schema `nextcloud` here)
 
-The Weave backend is deployed as `weave-backend` and routed canonically through `api.<tenant_domain>/api`. It is configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. The default local image tag is `weave-backend:local`; set `TF_VAR_weave_backend_image` to a locally built tag or pinned release digest for deterministic validation. The self-hosted live-stack CI path always builds the backend image from the selected backend ref before bootstrapping infra.
+The Weave backend is deployed as `weave-backend` and routed canonically through `api.<tenant_domain>/api`. It is configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. The backend also receives server-side Nextcloud files/calendar actor configuration from `TF_VAR_nextcloud_backend_actor_username` and `TF_VAR_nextcloud_backend_actor_token`; `install.sh` provisions that local/dev Nextcloud user idempotently and stores the token only in the private bootstrap env. The default local image tag is `weave-backend:local`; set `TF_VAR_weave_backend_image` to a locally built tag or pinned release digest for deterministic validation. The self-hosted live-stack CI path always builds the backend image from the selected backend ref before bootstrapping infra.
 
 The Matrix stack uses Matrix Authentication Service delegated auth through MAS' modern Synapse adapter. Keep the default MAS image unless an override has been checked against the generated `synapse_modern` config and `on_conflict: set` localpart policy. Keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later so MAS can provision and link users through the homeserver MAS API.
 
@@ -196,7 +196,7 @@ export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.en
 
 `WEAVE_BASE_URL` must match the canonical Caddy API route under `api.<tenant_domain>/api`. `WEAVE_OIDC_ISSUER_URL` must match the public Keycloak issuer used in access tokens. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
 
-For local app/runtime configuration without secrets, source or inspect `weave-workspace/.generated/app-config.env`. It includes the product gateway, backend API, auth issuer, Matrix homeserver, Weave product files/calendar routes, and a clearly labeled `WEAVE_NEXTCLOUD_TECHNICAL_BASE_URL` for raw Nextcloud admin/protocol fallback only.
+For local app/runtime configuration without secrets, source or inspect `weave-workspace/.generated/app-config.env`. It includes the product gateway, backend API, auth issuer, Matrix homeserver, Weave product files/calendar routes, and a clearly labeled `WEAVE_NEXTCLOUD_TECHNICAL_BASE_URL` for raw Nextcloud admin/protocol fallback only. It intentionally omits the backend-owned Nextcloud actor token; use the private `weave-workspace/.generated/bootstrap.env` only for local backend/server-side runs that need those secrets.
 
 The test user is disabled by default. Enable it only for local integration testing and smoke validation:
 
