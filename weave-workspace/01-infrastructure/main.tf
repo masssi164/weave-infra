@@ -93,6 +93,11 @@ locals {
   weave_app_client_id    = "weave-app"
   weave_backend_audience = local.weave_app_client_id
 
+  # Backend-to-Nextcloud adapter traffic runs inside the Docker network.
+  # Public 127.0.0.1.sslip.io URLs work for the host/browser, but loop back to
+  # the backend container itself when used from inside the backend container.
+  nextcloud_internal_base_url = "http://${local.service_names.nextcloud}"
+
   service_databases = {
     keycloak = {
       database_name        = "${var.db_name}_keycloak"
@@ -357,12 +362,12 @@ module "backend" {
   matrix_base_url                  = local.public_urls.matrix
   files_product_url                = "${local.public_urls.weave}/files"
   calendar_product_url             = "${local.public_urls.weave}/calendar"
-  nextcloud_base_url               = local.public_urls.files
+  nextcloud_base_url               = local.nextcloud_internal_base_url
   nextcloud_files_actor_model      = "backend-service-account"
   nextcloud_files_actor_username   = var.nextcloud_backend_actor_username
   nextcloud_files_actor_token      = var.nextcloud_backend_actor_token
   nextcloud_files_webdav_root_path = "/remote.php/dav/files"
-  caldav_base_url                  = local.public_urls.files
+  caldav_base_url                  = local.nextcloud_internal_base_url
   caldav_calendar_path_template    = "/remote.php/dav/calendars/{user}/personal/"
   caldav_auth_mode                 = "BASIC"
   caldav_backend_username          = var.nextcloud_backend_actor_username
