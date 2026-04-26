@@ -30,7 +30,7 @@ resource "docker_container" "this" {
     "POSTGRES_PASSWORD=${var.db_password}",
     "NEXTCLOUD_ADMIN_USER=${var.admin_username}",
     "NEXTCLOUD_ADMIN_PASSWORD=${var.admin_password}",
-    "NEXTCLOUD_TRUSTED_DOMAINS=${var.public_host} localhost 127.0.0.1",
+    "NEXTCLOUD_TRUSTED_DOMAINS=${var.public_host} ${var.container_name} localhost 127.0.0.1",
     "OVERWRITEHOST=${var.public_host}${var.public_port_suffix}",
     "OVERWRITECLIURL=${var.public_url}",
     "OVERWRITEPROTOCOL=${var.public_scheme}",

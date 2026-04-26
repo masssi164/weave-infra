@@ -140,6 +140,7 @@ assert_backend_nextcloud_actor_config() {
   local actor_username
   local actor_model
   local webdav_root
+  local backend_nextcloud_base_url
   local caldav_base_url
   local caldav_template
   local caldav_auth_mode
@@ -172,8 +173,9 @@ assert_backend_nextcloud_actor_config() {
   webdav_root="$(container_env_value weave-backend WEAVE_NEXTCLOUD_FILES_WEBDAV_ROOT_PATH)"
   [[ "${webdav_root}" == "/remote.php/dav/files" ]] || fail "Operator check failed: unexpected files WebDAV root path ${webdav_root}"
 
+  backend_nextcloud_base_url="$(container_env_value weave-backend WEAVE_NEXTCLOUD_BASE_URL)"
   caldav_base_url="$(container_env_value weave-backend WEAVE_CALDAV_BASE_URL)"
-  [[ "${caldav_base_url}" == "${WEAVE_NEXTCLOUD_BASE_URL}" ]] || fail "Operator check failed: CalDAV base URL should match the canonical Nextcloud base URL"
+  [[ "${caldav_base_url}" == "${backend_nextcloud_base_url}" ]] || fail "Operator check failed: CalDAV base URL should match the backend Nextcloud adapter base URL"
 
   caldav_template="$(container_env_value weave-backend WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE)"
   [[ "${caldav_template}" == *"{user}"* ]] || fail "Operator check failed: CalDAV calendar path template must contain {user}"
