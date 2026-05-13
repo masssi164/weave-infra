@@ -104,6 +104,20 @@ curl_json() {
     "$url"
 }
 
+url_encode() {
+  local value="$1"
+  jq -nr --arg value "${value}" '$value|@uri'
+}
+
+matrix_room_id_by_alias() {
+  local matrix_base_url="$1"
+  local alias="$2"
+  local response
+
+  response="$(curl_json "${matrix_base_url}/_matrix/client/v3/directory/room/$(url_encode "${alias}")")"
+  jq -r '.room_id' <<<"${response}"
+}
+
 curl_form() {
   local url="$1"
   shift
@@ -369,5 +383,34 @@ assert_json "${mas_discovery}" ".issuer == \"${matrix_base_url}/\"" "MAS issuer 
 assert_json "${mas_discovery}" ".authorization_endpoint | contains(\"/authorize\")" "MAS discovery should expose an authorization endpoint"
 authorize_status="$(curl_status "${matrix_base_url}/authorize")"
 [[ "${authorize_status}" == "400" ]] || fail "Smoke check failed: MAS authorize endpoint should be reachable and reject incomplete requests with 400"
+
+log "Checking default Matrix workspace provisioning..."
+matrix_homeserver="${matrix_base_url#*://}"
+matrix_homeserver="${matrix_homeserver%%/*}"
+matrix_homeserver="${matrix_homeserver%%:*}"
+matrix_space_alias="#${WEAVE_MATRIX_WORKSPACE_ALIAS_LOCALPART:-weave-workspace}:${matrix_homeserver}"
+matrix_announcements_alias="#${WEAVE_MATRIX_ANNOUNCEMENTS_ALIAS_LOCALPART:-announcements}:${matrix_homeserver}"
+matrix_general_alias="#${WEAVE_MATRIX_GENERAL_ALIAS_LOCALPART:-general}:${matrix_homeserver}"
+matrix_help_alias="#${WEAVE_MATRIX_HELP_ALIAS_LOCALPART:-help}:${matrix_homeserver}"
+
+matrix_space_id="$(matrix_room_id_by_alias "${matrix_base_url}" "${matrix_space_alias}")"
+matrix_announcements_id="$(matrix_room_id_by_alias "${matrix_base_url}" "${matrix_announcements_alias}")"
+matrix_general_id="$(matrix_room_id_by_alias "${matrix_base_url}" "${matrix_general_alias}")"
+matrix_help_id="$(matrix_room_id_by_alias "${matrix_base_url}" "${matrix_help_alias}")"
+[[ "${matrix_space_id}" == \!* ]] || fail "Smoke check failed: default Matrix space alias did not resolve"
+[[ "${matrix_announcements_id}" == \!* ]] || fail "Smoke check failed: announcements room alias did not resolve"
+[[ "${matrix_general_id}" == \!* ]] || fail "Smoke check failed: general room alias did not resolve"
+[[ "${matrix_help_id}" == \!* ]] || fail "Smoke check failed: help room alias did not resolve"
+
+[[ -n "${WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN:-}" ]] || fail "Smoke check failed: Matrix provisioner token is missing from private bootstrap env"
+announcements_child_state="$(curl_auth_json "${WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN}" "${matrix_base_url}/_matrix/client/v3/rooms/$(url_encode "${matrix_space_id}")/state/m.space.child/$(url_encode "${matrix_announcements_id}")")"
+general_child_state="$(curl_auth_json "${WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN}" "${matrix_base_url}/_matrix/client/v3/rooms/$(url_encode "${matrix_space_id}")/state/m.space.child/$(url_encode "${matrix_general_id}")")"
+help_child_state="$(curl_auth_json "${WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN}" "${matrix_base_url}/_matrix/client/v3/rooms/$(url_encode "${matrix_space_id}")/state/m.space.child/$(url_encode "${matrix_help_id}")")"
+assert_json "${announcements_child_state}" ".via | index(\"${matrix_homeserver}\") != null" "announcements should be attached to the default Matrix space"
+assert_json "${general_child_state}" ".via | index(\"${matrix_homeserver}\") != null" "general should be attached to the default Matrix space"
+assert_json "${help_child_state}" ".via | index(\"${matrix_homeserver}\") != null" "help should be attached to the default Matrix space"
+
+announcements_power_levels="$(curl_auth_json "${WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN}" "${matrix_base_url}/_matrix/client/v3/rooms/$(url_encode "${matrix_announcements_id}")/state/m.room.power_levels/")"
+assert_json "${announcements_power_levels}" '.events_default == 50 and .users_default == 0' "announcements posting should be limited to owner/admin by default"
 
 log "Smoke checks passed."

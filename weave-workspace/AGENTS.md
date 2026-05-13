@@ -5,6 +5,7 @@
 ## Files
 
 - `install.sh`: applies both Terraform stages, waits for service readiness, and bootstraps Nextcloud OIDC.
+- `provision-matrix-default-workspace.sh`: creates/reuses the default Matrix workspace space plus announcements, general, and help rooms.
 - `release-verify.sh`: checks the public Release 1 URLs after a non-local install.
 - `release.env.example`: template for operator-managed single-host deployments.
 - `.env.example`: local hostname, port, and Caddy mount defaults.

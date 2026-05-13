@@ -82,6 +82,20 @@ curl_json() {
   curl "${args[@]}" "$url"
 }
 
+url_encode() {
+  local value="$1"
+  jq -nr --arg value "${value}" '$value|@uri'
+}
+
+matrix_room_id_by_alias() {
+  local matrix_base_url="$1"
+  local alias="$2"
+  local response
+
+  response="$(curl_json "${matrix_base_url}/_matrix/client/v3/directory/room/$(url_encode "${alias}")")"
+  jq -r '.room_id' <<<"${response}"
+}
+
 curl_status() {
   local url="$1"
   local -a args=(--silent --show-error)
@@ -251,5 +265,23 @@ assert_json "${matrix_versions}" '.versions | type == "array"' "public Matrix cl
 matrix_auth_metadata="$(curl_json "${WEAVE_MATRIX_HOMESERVER_URL}/_matrix/client/v1/auth_metadata")"
 assert_json "${matrix_auth_metadata}" ".issuer == \"${WEAVE_MATRIX_HOMESERVER_URL}/\"" "Matrix OAuth metadata should be served by MAS"
 assert_json "${matrix_auth_metadata}" '.authorization_endpoint | contains("/authorize")' "Matrix OAuth metadata should expose the MAS authorization endpoint"
+
+log "Checking default Matrix room aliases..."
+matrix_homeserver="${WEAVE_MATRIX_HOMESERVER_URL#*://}"
+matrix_homeserver="${matrix_homeserver%%/*}"
+matrix_homeserver="${matrix_homeserver%%:*}"
+matrix_space_alias="#${WEAVE_MATRIX_WORKSPACE_ALIAS_LOCALPART:-weave-workspace}:${matrix_homeserver}"
+matrix_announcements_alias="#${WEAVE_MATRIX_ANNOUNCEMENTS_ALIAS_LOCALPART:-announcements}:${matrix_homeserver}"
+matrix_general_alias="#${WEAVE_MATRIX_GENERAL_ALIAS_LOCALPART:-general}:${matrix_homeserver}"
+matrix_help_alias="#${WEAVE_MATRIX_HELP_ALIAS_LOCALPART:-help}:${matrix_homeserver}"
+
+matrix_space_id="$(matrix_room_id_by_alias "${WEAVE_MATRIX_HOMESERVER_URL}" "${matrix_space_alias}")"
+matrix_announcements_id="$(matrix_room_id_by_alias "${WEAVE_MATRIX_HOMESERVER_URL}" "${matrix_announcements_alias}")"
+matrix_general_id="$(matrix_room_id_by_alias "${WEAVE_MATRIX_HOMESERVER_URL}" "${matrix_general_alias}")"
+matrix_help_id="$(matrix_room_id_by_alias "${WEAVE_MATRIX_HOMESERVER_URL}" "${matrix_help_alias}")"
+[[ "${matrix_space_id}" == \!* ]] || fail "Operator check failed: default Matrix space alias did not resolve"
+[[ "${matrix_announcements_id}" == \!* ]] || fail "Operator check failed: announcements room alias did not resolve"
+[[ "${matrix_general_id}" == \!* ]] || fail "Operator check failed: general room alias did not resolve"
+[[ "${matrix_help_id}" == \!* ]] || fail "Operator check failed: help room alias did not resolve"
 
 log "Operator checks passed."

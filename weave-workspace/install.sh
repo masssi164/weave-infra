@@ -66,6 +66,21 @@ readonly PERSISTED_TF_VARS=(
   TF_VAR_synapse_registration_shared_secret
   TF_VAR_synapse_macaroon_secret_key
   TF_VAR_synapse_form_secret
+  WEAVE_MATRIX_PROVISIONER_LOCALPART
+  WEAVE_MATRIX_PROVISIONER_PASSWORD
+  WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN
+  WEAVE_MATRIX_DEFAULT_MEMBER_LOCALPART
+  WEAVE_MATRIX_DEFAULT_MEMBER_PASSWORD
+  WEAVE_MATRIX_DEFAULT_MEMBER_ACCESS_TOKEN
+  WEAVE_MATRIX_WORKSPACE_ALIAS_LOCALPART
+  WEAVE_MATRIX_WORKSPACE_NAME
+  WEAVE_MATRIX_ANNOUNCEMENTS_ALIAS_LOCALPART
+  WEAVE_MATRIX_GENERAL_ALIAS_LOCALPART
+  WEAVE_MATRIX_HELP_ALIAS_LOCALPART
+  WEAVE_MATRIX_DEFAULT_SPACE_ID
+  WEAVE_MATRIX_DEFAULT_ANNOUNCEMENTS_ID
+  WEAVE_MATRIX_DEFAULT_GENERAL_ID
+  WEAVE_MATRIX_DEFAULT_HELP_ID
 )
 
 log() {
@@ -936,6 +951,7 @@ print_summary() {
   log "- Backend ready: $(integration_test_base_url)/health/ready"
   log "- Keycloak discovery: $(integration_test_oidc_issuer_url)/.well-known/openid-configuration"
   log "- Matrix versions: ${TF_VAR_public_scheme}://$(public_host "${TF_VAR_matrix_subdomain}")${suffix}/_matrix/client/versions"
+  log "- Matrix default rooms: #announcements:$(public_host "${TF_VAR_matrix_subdomain}"), #general:$(public_host "${TF_VAR_matrix_subdomain}"), #help:$(public_host "${TF_VAR_matrix_subdomain}")"
   log "- Raw Nextcloud: $(nextcloud_public_url)/"
   log
   log "Admin credentials (local/dev only):"
@@ -959,6 +975,7 @@ main() {
   require_command curl
   require_command docker
   require_command openssl
+  require_command python3
   require_command terraform
 
   ensure_generated_directories
@@ -995,6 +1012,9 @@ main() {
 
   log "Waiting for Synapse readiness..."
   wait_for_http_200 "Synapse" "http://${LOOPBACK_HOST}:${TF_VAR_synapse_host_port}/_matrix/client/versions"
+
+  log "Provisioning default Matrix workspace space and rooms..."
+  bash "${ROOT_DIR}/provision-matrix-default-workspace.sh"
 
   log "Waiting for Nextcloud OCC availability..."
   wait_for_nextcloud 120 5
