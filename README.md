@@ -133,6 +133,8 @@ The Weave backend is deployed as `weave-backend` and routed canonically through 
 
 The Matrix stack uses Matrix Authentication Service delegated auth through MAS' modern Synapse adapter. Keep the default MAS image unless an override has been checked against the generated `synapse_modern` config and `on_conflict: set` localpart policy. Keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later so MAS can provision and link users through the homeserver MAS API.
 
+`install.sh` also idempotently provisions the MVP default Matrix workspace: one `Weave Workspace` space plus `announcements`, `general`, and `help` rooms. Stable local aliases are `#weave-workspace:matrix.weave.local`, `#announcements:matrix.weave.local`, `#general:matrix.weave.local`, and `#help:matrix.weave.local`; see `docs/matrix-default-workspace.md` for non-local alias derivation, access policy, and current role-automation follow-ups.
+
 If that backend image is private in GHCR, authenticate the Docker client before running `install.sh` or `smoke-test.sh`. The consumer side should use an explicit `docker login ghcr.io` step or a CI login action rather than relying on an ambient cached session.
 
 ## Release 1 target
