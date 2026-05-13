@@ -69,6 +69,29 @@ remove_network() {
   fi
 }
 
+confirm_volume_removal() {
+  if [[ "${WEAVE_REMOVE_VOLUMES:-false}" != "true" ]]; then
+    return 1
+  fi
+
+  if [[ "${WEAVE_CONFIRM_REMOVE_VOLUMES:-}" == "weave-delete-local-data" ]]; then
+    return 0
+  fi
+
+  cat >&2 <<'EOF'
+Refusing to remove persistent Weave Docker volumes without explicit confirmation.
+
+Container/network cleanup is safe by default and has already been requested. To
+also delete local data volumes, rerun with both:
+
+  WEAVE_REMOVE_VOLUMES=true
+  WEAVE_CONFIRM_REMOVE_VOLUMES=weave-delete-local-data
+
+This deletes local Postgres, Keycloak, Synapse, Nextcloud, and Caddy state.
+EOF
+  exit 2
+}
+
 load_bootstrap_env() {
   local env_file=""
 
@@ -108,7 +131,7 @@ main() {
 
   remove_network
 
-  if [[ "${WEAVE_REMOVE_VOLUMES:-false}" == "true" ]]; then
+  if confirm_volume_removal; then
     local volume
     for volume in "${WEAVE_VOLUMES[@]}"; do
       remove_volume "${volume}"
