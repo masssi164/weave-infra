@@ -1,4 +1,4 @@
-.PHONY: dev-hosts smoke release-verify operator-check
+.PHONY: dev-hosts smoke release-verify operator-check backup restore-smoke support-bundle
 
 DEV_HOSTS_LINE := 127.0.0.1 weave.local api.weave.local auth.weave.local files.weave.local matrix.weave.local
 
@@ -14,3 +14,12 @@ release-verify:
 
 operator-check:
 	@bash weave-workspace/operator-check.sh
+
+backup:
+	@bash weave-workspace/backup.sh
+
+restore-smoke:
+	@bash weave-workspace/restore-smoke.sh
+
+support-bundle:
+	@bash weave-workspace/support-bundle.sh

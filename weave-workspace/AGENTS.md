@@ -7,6 +7,8 @@
 - `install.sh`: applies both Terraform stages, waits for service readiness, and bootstraps Nextcloud OIDC.
 - `provision-matrix-default-workspace.sh`: creates/reuses the default Matrix workspace space plus announcements, general, and help rooms.
 - `release-verify.sh`: checks the public Release 1 URLs after a non-local install.
+- `backup.sh`: manually creates a private Release 1 backup artifact set for operator-managed storage.
+- `restore-smoke.sh`: verifies recovery readiness after a restore or clean reprovisioning rehearsal without deleting data.
 - `release.env.example`: template for operator-managed single-host deployments.
 - `.env.example`: local hostname, port, and Caddy mount defaults.
 - `docker-compose.yml`: Caddy service definition for proxy-only iteration against the Terraform-created network.

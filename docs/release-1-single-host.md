@@ -85,10 +85,11 @@ Minimum expectation:
 
 These paths or named volumes are release data and must survive host replacement or operator error:
 
-- PostgreSQL data volume for Keycloak, MAS, Synapse, and Nextcloud databases
-- Nextcloud application data volume
-- Caddy data volume when using ACME-managed certificates
-- generated Matrix or MAS signing material if stored outside the database
+- PostgreSQL service data for Keycloak, MAS, Synapse, Nextcloud, and the Weave backend
+- Nextcloud application data volume for files/calendar storage
+- Matrix/Synapse media and local data volume
+- Caddy data/config volumes when using ACME-managed certificates
+- generated bootstrap env, TLS material, and generated Matrix/MAS/backend config or signing material needed for reprovisioning
 
 Before go-live, decide whether persistence is:
 
@@ -133,10 +134,11 @@ The script checks:
 At minimum, operators need:
 
 - a secret inventory and rotation plan
-- backup and restore procedure for Postgres and Nextcloud data
+- backup and restore procedure for Postgres-backed service data, Nextcloud data, Matrix/Synapse media, Caddy/TLS state, and generated config/secrets
 - image upgrade procedure with a rollback point
 - a post-deploy verification step using `release-verify.sh`
 - a host-local verification step using `operator-check.sh`
+- a restore rehearsal ending with `restore-smoke.sh`
 - a redacted diagnostics step using `support-bundle.sh` before sharing logs for help
 - a note explaining whether test users are forbidden or temporarily enabled in the environment
 
