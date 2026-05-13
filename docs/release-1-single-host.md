@@ -137,6 +137,7 @@ At minimum, operators need:
 - image upgrade procedure with a rollback point
 - a post-deploy verification step using `release-verify.sh`
 - a host-local verification step using `operator-check.sh`
+- a redacted diagnostics step using `support-bundle.sh` before sharing logs for help
 - a note explaining whether test users are forbidden or temporarily enabled in the environment
 
 Use `docs/operator-runbook.md` as the concrete Release 1 runbook for install, verification, rotation, backup, restore, and first-line triage.

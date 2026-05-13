@@ -193,6 +193,16 @@ MAS is served behind the matrix hostname; no separate `mas.<tenant_domain>` entr
 
 For the Release 1 operator layer, including secrets rotation expectations, backup scope, restore order, and routine triage commands, use `docs/operator-runbook.md`.
 
+### Support bundle
+
+When you need to ask for help, create a redacted diagnostics bundle before sharing logs manually:
+
+```sh
+bash weave-workspace/support-bundle.sh
+```
+
+The bundle includes public URL/config summaries, container/service status, recent service logs, disk/volume summaries, and optional operator-check/release-verify output when `WEAVE_SUPPORT_BUNDLE_RUN_CHECKS=true` is set. It redacts common secret patterns and fails if obvious tokens, passwords, cookies, authorization headers, or private keys remain. A support bundle is **not** a backup; follow `docs/operator-runbook.md#5-backup-expectations` for backup/restore.
+
 ## Integration Tests
 
 Integration tests should call the backend through the Caddy proxy URL, not the direct backend container port. For the default local stack:
