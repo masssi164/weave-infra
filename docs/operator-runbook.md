@@ -92,44 +92,49 @@ The default Matrix workspace is provisioned by `weave-workspace/provision-matrix
 
 ## 5. Backup expectations
 
-Release 1 does not ship automated backup jobs, so operators must run explicit backups.
-Minimum backup set:
-
-- PostgreSQL data from container `weave-db`
-- Nextcloud app data volume `weave_nextcloud_data`
-- Caddy data volume `weave_caddy_data` when ACME state matters
-
-Example host-local backup commands:
+Release 1 does not ship scheduled backup jobs, but it does provide a manually runnable backup helper for operator-owned backup storage:
 
 ```bash
-mkdir -p /var/backups/weave
-stamp="$(date +%Y%m%d-%H%M%S)"
-docker exec weave-db pg_dumpall -U "$TF_VAR_db_admin_username" > "/var/backups/weave/postgres-${stamp}.sql"
-docker run --rm \
-  -v weave_nextcloud_data:/source:ro \
-  -v /var/backups/weave:/backup \
-  alpine sh -c "tar -C /source -czf /backup/nextcloud-data-${stamp}.tgz ."
+bash weave-workspace/backup.sh /var/backups/weave
 ```
+
+The helper writes one timestamped directory and sets restrictive file permissions. Treat that directory as secret production data, not as a support artifact. It includes:
+
+- `postgres.sql`: PostgreSQL-backed service data for Keycloak, MAS, Synapse, Nextcloud, and Weave backend databases from container `weave-db`
+- `nextcloud-data.tgz`: Nextcloud files/calendar application data from Docker volume `weave_nextcloud_data`
+- `matrix-synapse-data.tgz`: Matrix/Synapse media and local data from Docker volume `weave_synapse_data`
+- `caddy-data.tgz` and `caddy-config.tgz`: Caddy ACME/TLS state and runtime config when local Caddy owns certificates
+- `keycloak-data.tgz`: Keycloak container-side runtime data from Docker volume `weave_keycloak_data`
+- `generated-config-secrets.tgz`: generated bootstrap env, no-secret app config, TLS material, and generated Terraform service config needed to restore or reprovision without inventing credentials
+- `MANIFEST.txt`: artifact list and restore-smoke reminder
+
+Support bundles are **not** backups. `support-bundle.sh` deliberately excludes raw databases, Matrix media, Nextcloud files/calendar data, Caddy ACME state, and generated secrets.
 
 Minimum expectation before calling the stack release-ready:
 
 - backups run on a schedule owned by the operator
 - at least one recent backup is stored off-host or on snapshot-backed storage
 - one restore rehearsal has been performed and written down
+- the restore rehearsal ends with `bash weave-workspace/restore-smoke.sh <backup-dir>`
 
-## 6. Restore outline
+## 6. Restore outline and smoke
 
 For a host-level restore or failed upgrade rollback:
 
 1. stop further writes to the stack
-2. restore the release env file and TLS material
-3. restore the Postgres dump
-4. restore Nextcloud data volume contents if needed
-5. run `bash weave-workspace/install.sh`
-6. run `bash weave-workspace/release-verify.sh`
-7. run `bash weave-workspace/operator-check.sh`
+2. restore the release env file, generated config/secrets, and TLS material from `generated-config-secrets.tgz`
+3. restore the Postgres dump from `postgres.sql`
+4. restore `weave_nextcloud_data`, `weave_synapse_data`, Caddy volumes, and Keycloak runtime volume from their `.tgz` archives when those volumes are part of the deployment
+5. run `bash weave-workspace/install.sh` to reconcile containers and generated config
+6. run `bash weave-workspace/restore-smoke.sh <backup-dir>`
 
-If the deployment is badly wedged but data is safe, prefer a clean host plus restored data over ad-hoc container surgery.
+`restore-smoke.sh` is safe to run after a restore or clean reprovisioning rehearsal. It never deletes volumes and does not perform the restore itself. When a backup directory is provided it first checks for the expected backup artifacts, then reuses `operator-check.sh` to verify backend readiness, Keycloak discovery, Matrix client versions and MAS discovery, default Matrix room aliases, and raw Nextcloud readiness. If the restored Matrix database is intentionally empty but generated Matrix bootstrap secrets are available, run:
+
+```bash
+WEAVE_RESTORE_SMOKE_REPROVISION_MATRIX=true bash weave-workspace/restore-smoke.sh <backup-dir>
+```
+
+That option re-runs the idempotent default Matrix workspace provisioner before the checks. If the deployment is badly wedged but data is safe, prefer a clean host plus restored data over ad-hoc container surgery.
 
 ## 7. Stop, clean rebuild, and destructive reset
 

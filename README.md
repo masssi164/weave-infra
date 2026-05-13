@@ -195,6 +195,22 @@ MAS is served behind the matrix hostname; no separate `mas.<tenant_domain>` entr
 
 For the Release 1 operator layer, including secrets rotation expectations, backup scope, restore order, and routine triage commands, use `docs/operator-runbook.md`.
 
+### Backup and restore smoke
+
+Create an operator-owned backup artifact set before destructive maintenance:
+
+```sh
+bash weave-workspace/backup.sh /var/backups/weave
+```
+
+The backup directory contains raw databases, volume archives, and generated config/secrets. Keep it private and do not attach it to support issues. After restoring or cleanly reprovisioning from those artifacts, run the non-destructive recovery smoke:
+
+```sh
+bash weave-workspace/restore-smoke.sh /var/backups/weave/<weave-backup-timestamp>
+```
+
+The restore smoke verifies backend readiness, Keycloak discovery, Matrix/MAS discovery, default Matrix room aliases, and raw Nextcloud readiness. It does not restore data or delete volumes.
+
 ### Support bundle
 
 When you need to ask for help, create a redacted diagnostics bundle before sharing logs manually:

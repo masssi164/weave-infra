@@ -14,6 +14,8 @@ This repository contains one runnable workspace under `weave-workspace/`.
 - `weave-workspace/.env.example`: local hostname, port, and Caddy mount defaults.
 - `weave-workspace/release.env.example`: single-host Release 1 env template with explicit production-facing placeholders.
 - `weave-workspace/release-verify.sh`: public endpoint verification script for release operators.
+- `weave-workspace/backup.sh`: manually runnable Release 1 backup helper for Postgres dumps, required data volumes, and generated config/secrets.
+- `weave-workspace/restore-smoke.sh`: non-destructive post-restore/reprovisioning smoke wrapper around the recovery readiness checks.
 - `weave-workspace/provision-matrix-default-workspace.sh`: idempotent default Matrix space/room provisioner invoked by install.
 - `weave-workspace/docker-compose.yml`: Caddy service definition for proxy-only iteration against the Terraform-created network.
 - `weave-workspace/AGENTS.md`: workspace-level navigation guide.
