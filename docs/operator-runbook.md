@@ -128,7 +128,19 @@ For a host-level restore or failed upgrade rollback:
 
 If the deployment is badly wedged but data is safe, prefer a clean host plus restored data over ad-hoc container surgery.
 
-## 7. Minimum observability and triage
+## 7. Stop, clean rebuild, and destructive reset
+
+Use the least destructive action that solves the problem:
+
+1. **Stop/restart containers:** use normal Docker or Terraform apply workflows when you only need a service restart. Persistent Docker volumes and generated secrets stay intact.
+2. **Clean rebuild:** run `bash weave-workspace/teardown.sh`, then `bash weave-workspace/install.sh`. This removes Weave containers and the Docker network so Terraform can recreate them, but it preserves persistent volumes and `.generated/` secrets/config by default.
+3. **Destructive local reset:** only after a backup, run `WEAVE_REMOVE_VOLUMES=true WEAVE_CONFIRM_DESTRUCTIVE_RESET=<tenant_slug> bash weave-workspace/teardown.sh`. For the default local tenant, `<tenant_slug>` is `weave`.
+
+The destructive path prints the backup guidance, affected data domains, and exact Docker volumes before deleting anything. It deletes persistent Docker volumes for Keycloak identity/session data, backend/Postgres data, Matrix/Synapse database and media, Nextcloud database/files/calendar data, shared Postgres databases, and Caddy/TLS state. It does not delete `.generated/` files; copy or remove those intentionally as a separate operator step.
+
+The old `WEAVE_CONFIRM_REMOVE_VOLUMES=weave-delete-local-data` token is deliberately rejected so operators type the tenant/workspace slug instead of copying a generic phrase.
+
+## 8. Minimum observability and triage
 
 Useful commands:
 
@@ -150,7 +162,7 @@ Escalate quickly when any of these fail:
 - Nextcloud `status.php` is not installed/healthy
 - Matrix delegated auth discovery, client versions, or `/authorize` is unavailable
 
-## 8. Known Release 1 limits
+## 9. Known Release 1 limits
 
 These are still intentionally out of scope for this repo slice:
 

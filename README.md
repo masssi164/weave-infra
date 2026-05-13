@@ -43,7 +43,7 @@ There are now two supported port modes:
 
 Use the canonical ports only when Weave owns the machine's standard local ports. On any shared Docker host or self-hosted runner, use the isolated block. `install.sh` defaults to the isolated block, and `.env.example` shows both modes explicitly.
 
-If you need a completely clean rerun on a shared host, use the runner-hygiene helper before or after bootstrap:
+If you need a clean container/network rerun on a shared host, use the runner-hygiene helper before or after bootstrap:
 
 ```bash
 cd weave-workspace
@@ -52,7 +52,18 @@ WEAVE_RUNNER_HYGIENE=true ./install.sh
 bash ./teardown.sh
 ```
 
-Set `WEAVE_REMOVE_VOLUMES=true WEAVE_CONFIRM_REMOVE_VOLUMES=weave-delete-local-data` when you also want to remove persisted Docker volumes such as `weave_synapse_data`. Volume removal is deliberately a two-variable destructive opt-in; plain `teardown.sh` preserves local data volumes.
+`teardown.sh` is non-destructive by default: it removes Weave containers and the Docker network but preserves persistent Docker volumes and generated local secrets/config. This is the right path for ordinary stop/restart cleanup.
+
+A destructive local reset requires both an opt-in flag and the typed tenant/workspace slug. For the default local tenant, run it only after reading the backup guidance in `docs/operator-runbook.md#5-backup-expectations`:
+
+```bash
+cd weave-workspace
+WEAVE_REMOVE_VOLUMES=true \
+WEAVE_CONFIRM_DESTRUCTIVE_RESET=weave \
+bash ./teardown.sh
+```
+
+Before deleting volumes, the helper lists the affected data domains: Keycloak identity/session data, backend/Postgres data, Matrix/Synapse database and media, Nextcloud database/files/calendar data, Caddy/TLS state, and the exact Docker volumes. Generated `.generated/` secrets/config are not removed by the helper; back them up or delete them manually only when that is intended.
 
 ## TLS Setup
 
