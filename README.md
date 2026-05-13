@@ -52,7 +52,7 @@ WEAVE_RUNNER_HYGIENE=true ./install.sh
 bash ./teardown.sh
 ```
 
-Set `WEAVE_REMOVE_VOLUMES=true` when you also want to remove persisted Docker volumes such as `weave_synapse_data`.
+Set `WEAVE_REMOVE_VOLUMES=true WEAVE_CONFIRM_REMOVE_VOLUMES=weave-delete-local-data` when you also want to remove persisted Docker volumes such as `weave_synapse_data`. Volume removal is deliberately a two-variable destructive opt-in; plain `teardown.sh` preserves local data volumes.
 
 ## TLS Setup
 
@@ -118,7 +118,7 @@ The infrastructure stage currently materializes these PostgreSQL databases insid
 - `<db_name>_synapse`
 - `<db_name>` (Nextcloud stores its tables in schema `nextcloud` here)
 
-The Weave backend is deployed as `weave-backend` and routed canonically through `api.<tenant_domain>/api`. It is configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. The backend also receives server-side Nextcloud files/calendar actor configuration from `TF_VAR_nextcloud_backend_actor_username` and `TF_VAR_nextcloud_backend_actor_token`; `install.sh` provisions that local/dev Nextcloud user idempotently and stores the token only in the private bootstrap env. The default local image tag is `weave-backend:local`; set `TF_VAR_weave_backend_image` to a locally built tag or pinned release digest for deterministic validation. The self-hosted live-stack CI path always builds the backend image from the selected backend ref before bootstrapping infra.
+The Weave backend is deployed as `weave-backend` and routed canonically through `api.<tenant_domain>/api`. It is configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. The backend also receives server-side Nextcloud files/calendar actor configuration from `TF_VAR_nextcloud_backend_actor_username` and `TF_VAR_nextcloud_backend_actor_token`; `install.sh` provisions that local/dev Nextcloud user idempotently and stores the token only in the private bootstrap env. The default local image tag is `weave-backend:local`; set `TF_VAR_weave_backend_image` to a locally built tag or pinned release digest for deterministic validation. The full-stack smoke/live-stack CI paths are manual-only. They build the backend image from the selected backend ref before bootstrapping infra only after the workflow dispatcher confirms the solar/storage/power budget is acceptable. A future optional Home Assistant preflight may query local sensors, but this repository does not assume HA secrets.
 
 The Matrix stack uses Matrix Authentication Service delegated auth through MAS' modern Synapse adapter. Keep the default MAS image unless an override has been checked against the generated `synapse_modern` config and `on_conflict: set` localpart policy. Keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later so MAS can provision and link users through the homeserver MAS API.
 

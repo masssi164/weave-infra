@@ -7,6 +7,11 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      confirm_power_budget_ok:
+        description: "Manual gate: confirm solar/storage/power budget is acceptable for full-stack smoke"
+        required: true
+        type: boolean
+        default: false
       weave_backend_image:
         description: "Backend image to validate in the smoke stack"
         required: false
@@ -25,14 +30,12 @@ env:
   WEAVE_BACKEND_IMAGE: ${{ github.event.inputs.weave_backend_image || 'weave-backend:smoke-ci' }}
   REQUESTED_WEAVE_BACKEND_REF: ${{ github.event.inputs.weave_backend_ref || github.head_ref || github.ref_name || 'main' }}
   DOCKER_BUILDKIT: '1'
-  WEAVE_REMOVE_VOLUMES: 'true'
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-
   validate:
     name: Validate Stack
     runs-on: ubuntu-latest
@@ -69,23 +72,33 @@ jobs:
           terraform -chdir=weave-workspace/02-keycloak-setup init -backend=false -input=false
           terraform -chdir=weave-workspace/02-keycloak-setup validate
 
-      - name: Lint bootstrap and smoke scripts
+      - name: Lint bootstrap, teardown, and smoke scripts
         run: |
           bash -n weave-workspace/install.sh
+          bash -n weave-workspace/teardown.sh
           bash -n weave-workspace/smoke-test.sh
-          shellcheck weave-workspace/install.sh weave-workspace/smoke-test.sh
+          shellcheck weave-workspace/install.sh weave-workspace/teardown.sh weave-workspace/smoke-test.sh
 
   smoke:
-    name: Full Stack Smoke
+    name: Manual Full Stack Smoke
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_power_budget_ok == true }}
     runs-on: ubuntu-latest
     needs: validate
     timeout-minutes: 45
+    env:
+      WEAVE_REMOVE_VOLUMES: 'true'
+      WEAVE_CONFIRM_REMOVE_VOLUMES: weave-delete-local-data
 
     defaults:
       run:
         shell: bash
 
     steps:
+      - name: Confirm manual power/storage gate
+        run: |
+          echo "Manual full-stack smoke gate accepted by workflow dispatcher."
+          echo "Optional future improvement: query Home Assistant solar/storage sensors before this point; no HA secrets are assumed here."
+
       - name: Check out repository
         uses: actions/checkout@v6
 
@@ -149,7 +162,12 @@ jobs:
 
       - name: Destroy stack
         if: always()
-        run: |
-          source weave-workspace/.generated/bootstrap.env || true
-          terraform -chdir=weave-workspace/02-keycloak-setup destroy -refresh=false -input=false -auto-approve || true
-          terraform -chdir=weave-workspace/01-infrastructure destroy -refresh=false -input=false -auto-approve || true
+        run: bash weave-workspace/teardown.sh
+
+  smoke-not-confirmed:
+    name: Full Stack Smoke Not Started
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_power_budget_ok != true }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Full-stack smoke is manual-only and was not started. Re-run with confirm_power_budget_ok=true when solar/storage budget is acceptable."
