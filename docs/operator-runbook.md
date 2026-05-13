@@ -155,6 +155,14 @@ bash weave-workspace/operator-check.sh
 bash weave-workspace/release-verify.sh
 ```
 
+For support requests, prefer a redacted support bundle over hand-copying raw logs:
+
+```bash
+bash weave-workspace/support-bundle.sh
+```
+
+Set `WEAVE_SUPPORT_BUNDLE_RUN_CHECKS=true` when you want the bundle to include fresh `operator-check.sh` and `release-verify.sh` output. The bundle includes public URL/config summaries, container status, recent service logs, disk/volume summaries, and recent smoke/operator/verify artifacts found under `.generated`. It is a diagnostics artifact only: it is **not** a backup and cannot restore Postgres databases, Matrix media, Nextcloud files/calendar data, Caddy ACME state, or generated secrets. Review the archive before sharing externally.
+
 Escalate quickly when any of these fail:
 
 - Keycloak discovery does not match the public issuer URL
