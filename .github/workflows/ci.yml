@@ -77,7 +77,11 @@ jobs:
           bash -n weave-workspace/install.sh
           bash -n weave-workspace/teardown.sh
           bash -n weave-workspace/smoke-test.sh
-          shellcheck weave-workspace/install.sh weave-workspace/teardown.sh weave-workspace/smoke-test.sh
+          bash -n weave-workspace/tests/teardown-guard-test.sh
+          shellcheck weave-workspace/install.sh weave-workspace/teardown.sh weave-workspace/smoke-test.sh weave-workspace/tests/teardown-guard-test.sh
+
+      - name: Test destructive reset guardrails
+        run: bash weave-workspace/tests/teardown-guard-test.sh
 
   smoke:
     name: Manual Full Stack Smoke
@@ -87,7 +91,7 @@ jobs:
     timeout-minutes: 45
     env:
       WEAVE_REMOVE_VOLUMES: 'true'
-      WEAVE_CONFIRM_REMOVE_VOLUMES: weave-delete-local-data
+      WEAVE_CONFIRM_DESTRUCTIVE_RESET: weave
 
     defaults:
       run:

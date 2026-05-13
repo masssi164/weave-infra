@@ -26,15 +26,38 @@ readonly WEAVE_VOLUMES=(
   weave_nextcloud_data
   weave_synapse_data
 )
+readonly DESTRUCTIVE_DATA_DOMAINS=(
+  "Keycloak identity/session data"
+  "Weave backend service data stored in Postgres"
+  "Matrix/Synapse database and media state"
+  "Nextcloud database, files, and calendar data"
+  "Shared Postgres service databases"
+  "Caddy/TLS state stored in Docker volumes"
+)
+readonly BACKUP_GUIDANCE="docs/operator-runbook.md#5-backup-expectations"
+readonly LEGACY_CONFIRMATION="weave-delete-local-data"
 
 log() {
   printf '%s\n' "$*"
+}
+
+dry_run_enabled() {
+  [[ "${WEAVE_TEARDOWN_DRY_RUN:-false}" == "true" ]]
+}
+
+required_destructive_confirmation() {
+  printf '%s' "${TF_VAR_tenant_slug:-weave}"
 }
 
 terraform_destroy() {
   local dir="$1"
 
   if [[ ! -d "${dir}" ]]; then
+    return
+  fi
+
+  if dry_run_enabled; then
+    log "DRY RUN: would run terraform destroy in ${dir}"
     return
   fi
 
@@ -45,6 +68,11 @@ terraform_destroy() {
 remove_container() {
   local name="$1"
 
+  if dry_run_enabled; then
+    log "DRY RUN: would remove container ${name}"
+    return
+  fi
+
   if docker container inspect "${name}" >/dev/null 2>&1; then
     log "Removing container ${name}"
     docker rm -f -v "${name}" >/dev/null 2>&1 || true
@@ -53,6 +81,11 @@ remove_container() {
 
 remove_volume() {
   local name="$1"
+
+  if dry_run_enabled; then
+    log "DRY RUN: would remove volume ${name}"
+    return
+  fi
 
   if docker volume inspect "${name}" >/dev/null 2>&1; then
     log "Removing volume ${name}"
@@ -63,31 +96,93 @@ remove_volume() {
 remove_network() {
   local network_name="${TF_VAR_docker_network_name:-weave_network}"
 
+  if dry_run_enabled; then
+    log "DRY RUN: would remove network ${network_name}"
+    return
+  fi
+
   if docker network inspect "${network_name}" >/dev/null 2>&1; then
     log "Removing network ${network_name}"
     docker network rm "${network_name}" >/dev/null 2>&1 || true
   fi
 }
 
+print_destructive_reset_scope() {
+  local required_confirmation
+  required_confirmation="$(required_destructive_confirmation)"
+
+  cat >&2 <<EOF
+Destructive Weave local/dev reset requested.
+
+Before deleting persistent data, read backup/restore guidance:
+  ${BACKUP_GUIDANCE}
+
+Affected data domains:
+EOF
+
+  local domain
+  for domain in "${DESTRUCTIVE_DATA_DOMAINS[@]}"; do
+    printf '  - %s\n' "${domain}" >&2
+  done
+
+  cat >&2 <<EOF
+
+Docker volumes scheduled for deletion:
+EOF
+
+  local volume
+  for volume in "${WEAVE_VOLUMES[@]}"; do
+    printf '  - %s\n' "${volume}" >&2
+  done
+
+  cat >&2 <<EOF
+
+Generated local secrets/config in .generated/ are not removed by this helper;
+back them up separately before deleting them manually.
+
+Required confirmation:
+  WEAVE_REMOVE_VOLUMES=true
+  WEAVE_CONFIRM_DESTRUCTIVE_RESET=${required_confirmation}
+EOF
+}
+
 confirm_volume_removal() {
+  local required_confirmation
+  required_confirmation="$(required_destructive_confirmation)"
+
   if [[ "${WEAVE_REMOVE_VOLUMES:-false}" != "true" ]]; then
+    log "Persistent Docker volumes: preserved. Set WEAVE_REMOVE_VOLUMES=true plus WEAVE_CONFIRM_DESTRUCTIVE_RESET=${required_confirmation} only after taking a backup."
     return 1
   fi
 
-  if [[ "${WEAVE_CONFIRM_REMOVE_VOLUMES:-}" == "weave-delete-local-data" ]]; then
+  print_destructive_reset_scope
+
+  if [[ "${WEAVE_CONFIRM_REMOVE_VOLUMES:-}" == "${LEGACY_CONFIRMATION}" && -z "${WEAVE_CONFIRM_DESTRUCTIVE_RESET:-}" ]]; then
+    cat >&2 <<EOF
+
+Refusing to remove persistent Weave Docker volumes: the old
+WEAVE_CONFIRM_REMOVE_VOLUMES=${LEGACY_CONFIRMATION} confirmation is no longer
+accepted. Type the tenant/workspace slug instead.
+EOF
+    exit 2
+  fi
+
+  if [[ "${WEAVE_CONFIRM_DESTRUCTIVE_RESET:-}" == "${required_confirmation}" ]]; then
+    log "Destructive reset confirmed for tenant/workspace slug '${required_confirmation}'."
     return 0
   fi
 
-  cat >&2 <<'EOF'
-Refusing to remove persistent Weave Docker volumes without explicit confirmation.
+  cat >&2 <<EOF
+
+Refusing to remove persistent Weave Docker volumes without the typed tenant/workspace confirmation.
 
 Container/network cleanup is safe by default and has already been requested. To
 also delete local data volumes, rerun with both:
 
   WEAVE_REMOVE_VOLUMES=true
-  WEAVE_CONFIRM_REMOVE_VOLUMES=weave-delete-local-data
+  WEAVE_CONFIRM_DESTRUCTIVE_RESET=${required_confirmation}
 
-This deletes local Postgres, Keycloak, Synapse, Nextcloud, and Caddy state.
+Do not run the destructive form until the backup guidance above has been reviewed.
 EOF
   exit 2
 }
@@ -107,16 +202,24 @@ load_bootstrap_env() {
   fi
 }
 
-main() {
+require_runtime_commands() {
+  if dry_run_enabled; then
+    return
+  fi
+
   command -v docker >/dev/null 2>&1 || {
     printf 'Missing required command: docker\n' >&2
     exit 1
   }
+
   command -v terraform >/dev/null 2>&1 || {
     printf 'Missing required command: terraform\n' >&2
     exit 1
   }
+}
 
+main() {
+  require_runtime_commands
   load_bootstrap_env
 
   if [[ "${WEAVE_TERRAFORM_DESTROY:-false}" == "true" ]]; then
