@@ -160,7 +160,7 @@ Current validation flow:
 - `bash weave-workspace/install.sh`
 - `bash weave-workspace/smoke-test.sh`
 
-GitHub Actions now runs both repository-safe validation and a Docker-backed full-stack smoke job on pushes and pull requests through `.github/workflows/ci.yml`.
+GitHub Actions runs repository-safe validation on pushes and pull requests through `.github/workflows/ci.yml`. The Docker-backed full-stack smoke job is intentionally manual-only (`workflow_dispatch`) and requires the dispatcher to confirm the solar/storage/power budget before it starts.
 
 For non-local Release 1 installs, run:
 
