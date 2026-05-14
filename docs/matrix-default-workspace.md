@@ -24,9 +24,15 @@ For a non-local tenant, replace `matrix.weave.local` with `matrix.<tenant_domain
 - Guest auto-join is intentionally disabled. Guests require an explicit invite/resource permission until role-driven Matrix membership automation lands.
 - Full owner/admin/member/guest synchronization from Keycloak roles remains a follow-up; this slice only pre-provisions the local/dev default structures and optional smoke-test member.
 
+## Provisioning credential path
+
+The current Synapse/MAS stack delegates Matrix authentication to Matrix Authentication Service (MAS), so the default workspace provisioner does **not** use Synapse shared-secret admin registration. Instead, `provision-matrix-default-workspace.sh` preflights the running MAS container, registers or refreshes the local provisioning users with `mas-cli`, and issues MAS compatibility tokens for Matrix Client-Server API room creation.
+
+By default the MAS container is `weave-mas`. Override `WEAVE_MATRIX_MAS_CONTAINER_NAME` only if the deployment intentionally uses a different container name. If MAS is not running or the image does not provide `mas-cli`, provisioning fails before room creation with an actionable error.
+
 ## Secret handling
 
-The script uses Synapse shared-secret registration and stores generated Matrix provisioner/member passwords and access tokens only in the private `weave-workspace/.generated/bootstrap.env` file. It does not print Matrix registration secrets, passwords, or access tokens. `support-bundle.sh` does not include these private values and its redaction check treats token/secret/password patterns as failures.
+The script stores generated Matrix provisioner/member passwords and MAS compatibility access tokens only in the private `weave-workspace/.generated/bootstrap.env` file. It does not print Matrix passwords or access tokens. `support-bundle.sh` does not include these private values and its redaction check treats token/secret/password patterns as failures.
 
 ## Verification
 

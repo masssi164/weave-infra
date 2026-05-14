@@ -83,13 +83,17 @@ jobs:
           bash -n weave-workspace/restore-smoke.sh
           bash -n weave-workspace/tests/teardown-guard-test.sh
           bash -n weave-workspace/tests/support-bundle-redaction-test.sh
-          shellcheck weave-workspace/install.sh weave-workspace/teardown.sh weave-workspace/smoke-test.sh weave-workspace/provision-matrix-default-workspace.sh weave-workspace/support-bundle.sh weave-workspace/backup.sh weave-workspace/restore-smoke.sh weave-workspace/tests/teardown-guard-test.sh weave-workspace/tests/support-bundle-redaction-test.sh
+          bash -n weave-workspace/tests/matrix-provisioning-mas-cli-test.sh
+          shellcheck weave-workspace/install.sh weave-workspace/teardown.sh weave-workspace/smoke-test.sh weave-workspace/provision-matrix-default-workspace.sh weave-workspace/support-bundle.sh weave-workspace/backup.sh weave-workspace/restore-smoke.sh weave-workspace/tests/teardown-guard-test.sh weave-workspace/tests/support-bundle-redaction-test.sh weave-workspace/tests/matrix-provisioning-mas-cli-test.sh
 
       - name: Test destructive reset guardrails
         run: bash weave-workspace/tests/teardown-guard-test.sh
 
       - name: Test support bundle redaction
         run: bash weave-workspace/tests/support-bundle-redaction-test.sh
+
+      - name: Test Matrix provisioning uses MAS CLI
+        run: bash weave-workspace/tests/matrix-provisioning-mas-cli-test.sh
 
   smoke:
     name: Manual Full Stack Smoke
