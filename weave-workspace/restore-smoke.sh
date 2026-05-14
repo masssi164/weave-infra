@@ -6,6 +6,7 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly ROOT_DIR
 REPROVISION_MATRIX="${WEAVE_RESTORE_SMOKE_REPROVISION_MATRIX:-false}"
+ARTIFACTS_ONLY="${WEAVE_RESTORE_SMOKE_ARTIFACTS_ONLY:-false}"
 
 log() {
   printf '%s\n' "$*"
@@ -34,6 +35,10 @@ Arguments:
 Environment:
   WEAVE_RESTORE_SMOKE_REPROVISION_MATRIX=true  Re-run the idempotent Matrix default
                                                workspace provisioner before checks.
+  WEAVE_RESTORE_SMOKE_ARTIFACTS_ONLY=true      Only validate backup artifact
+                                               presence, then exit. This is a
+                                               preflight/lint mode and does not
+                                               prove restored service readiness.
 USAGE
 }
 
@@ -68,6 +73,12 @@ main() {
   local backup_dir="${1:-}"
   if [[ -n "${backup_dir}" ]]; then
     check_backup_dir "${backup_dir}"
+  fi
+
+  if [[ "${ARTIFACTS_ONLY}" == "true" ]]; then
+    [[ -n "${backup_dir}" ]] || fail "WEAVE_RESTORE_SMOKE_ARTIFACTS_ONLY=true requires a backup directory argument."
+    log "Restore smoke artifact preflight passed. Service readiness was not checked in artifacts-only mode."
+    exit 0
   fi
 
   if [[ "${REPROVISION_MATRIX}" == "true" ]]; then
