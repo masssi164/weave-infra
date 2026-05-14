@@ -55,6 +55,8 @@ Set these explicitly before the first apply:
 - `TF_VAR_nextcloud_backend_actor_token` for the server-side backend Files/Calendar Nextcloud actor
 - all admin, database, MAS, and backend actor secrets consumed by `install.sh`
 
+Calendar facade note: Release 1 points backend Calendar operations at the backend actor's own `personal` CalDAV collection, making it the first Weave-managed workspace calendar. Do not configure private user calendar paths unless a later contract explicitly provisions sharing or delegated user access.
+
 Start from `weave-workspace/release.env.example`, copy it to a local untracked file, then replace every placeholder.
 
 ## TLS source

@@ -130,7 +130,8 @@ assert_backend_nextcloud_actor_config() {
   [[ "${caldav_base_url}" == "${backend_nextcloud_base_url}" ]] || fail "Release verify failed: CalDAV base URL should match the backend Nextcloud adapter base URL"
 
   caldav_template="$(container_env_value weave-backend WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE)"
-  [[ "${caldav_template}" == *"{user}"* ]] || fail "Release verify failed: CalDAV calendar path template must contain {user}"
+  [[ "${caldav_template}" != *"{user}"* ]] || fail "Release verify failed: CalDAV calendar path template must target the backend actor workspace calendar, not unresolved user-private calendars"
+  [[ "${caldav_template}" == "/remote.php/dav/calendars/${actor_username}/personal/" ]] || fail "Release verify failed: CalDAV calendar path template must target the backend actor workspace calendar"
 
   caldav_auth_mode="$(container_env_value weave-backend WEAVE_CALDAV_AUTH_MODE)"
   [[ "${caldav_auth_mode}" == "BASIC" || "${caldav_auth_mode}" == "BEARER" ]] || fail "Release verify failed: unsupported CalDAV auth mode ${caldav_auth_mode}"
