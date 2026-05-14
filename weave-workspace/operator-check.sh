@@ -173,7 +173,11 @@ assert_backend_nextcloud_actor_config() {
     WEAVE_CALDAV_AUTH_MODE \
     WEAVE_CALDAV_BACKEND_USERNAME \
     WEAVE_CALDAV_BACKEND_TOKEN \
-    WEAVE_CALDAV_REQUEST_TIMEOUT_SECONDS; do
+    WEAVE_CALDAV_REQUEST_TIMEOUT_SECONDS \
+    WEAVE_CALDAV_EXTERNAL_DISCOVERY_URL \
+    WEAVE_CALDAV_EXTERNAL_CREDENTIAL_MODE \
+    WEAVE_CALDAV_EXTERNAL_PROFILE_PASSWORD_MODE \
+    WEAVE_CALDAV_EXTERNAL_PRIVATE_USER_CALENDARS; do
     assert_backend_env_present "${name}"
   done
 
@@ -197,6 +201,24 @@ assert_backend_nextcloud_actor_config() {
 
   caldav_auth_mode="$(container_env_value weave-backend WEAVE_CALDAV_AUTH_MODE)"
   [[ "${caldav_auth_mode}" == "BASIC" || "${caldav_auth_mode}" == "BEARER" ]] || fail "Operator check failed: unsupported CalDAV auth mode ${caldav_auth_mode}"
+
+  local external_discovery_url
+  local external_credential_mode
+  local external_profile_password_mode
+  local external_private_user_calendars
+
+  external_discovery_url="$(container_env_value weave-backend WEAVE_CALDAV_EXTERNAL_DISCOVERY_URL)"
+  [[ "${external_discovery_url}" == */remote.php/dav ]] || fail "Operator check failed: external CalDAV discovery URL must point at /remote.php/dav"
+  [[ "${external_discovery_url}" != *"${caldav_username}"* ]] || fail "Operator check failed: external CalDAV discovery URL must not include backend actor identity"
+
+  external_credential_mode="$(container_env_value weave-backend WEAVE_CALDAV_EXTERNAL_CREDENTIAL_MODE)"
+  [[ "${external_credential_mode}" == "nextcloud-login-flow-app-password" ]] || fail "Operator check failed: external CalDAV credential mode must require revocable user-owned app passwords"
+
+  external_profile_password_mode="$(container_env_value weave-backend WEAVE_CALDAV_EXTERNAL_PROFILE_PASSWORD_MODE)"
+  [[ "${external_profile_password_mode}" == "omit" ]] || fail "Operator check failed: external CalDAV profiles must omit passwords"
+
+  external_private_user_calendars="$(container_env_value weave-backend WEAVE_CALDAV_EXTERNAL_PRIVATE_USER_CALENDARS)"
+  [[ "${external_private_user_calendars}" == "disabled" ]] || fail "Operator check failed: private user CalDAV calendars must stay disabled until provisioning/sharing is tested"
 
   docker exec --user www-data weave-nextcloud php occ user:info "${actor_username}" >/dev/null 2>&1 || \
     fail "Operator check failed: Nextcloud backend actor user is not provisioned"

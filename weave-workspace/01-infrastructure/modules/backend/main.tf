@@ -42,6 +42,10 @@ resource "docker_container" "this" {
     "WEAVE_CALDAV_BACKEND_USERNAME=${var.caldav_backend_username}",
     "WEAVE_CALDAV_BACKEND_TOKEN=${var.caldav_backend_token}",
     "WEAVE_CALDAV_REQUEST_TIMEOUT_SECONDS=${var.caldav_request_timeout_seconds}",
+    "WEAVE_CALDAV_EXTERNAL_DISCOVERY_URL=${var.caldav_external_discovery_url}",
+    "WEAVE_CALDAV_EXTERNAL_CREDENTIAL_MODE=${var.caldav_external_credential_mode}",
+    "WEAVE_CALDAV_EXTERNAL_PROFILE_PASSWORD_MODE=${var.caldav_external_profile_password_mode}",
+    "WEAVE_CALDAV_EXTERNAL_PRIVATE_USER_CALENDARS=${var.caldav_external_private_user_calendars}",
   ]
 
   ports {

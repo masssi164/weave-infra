@@ -11,7 +11,7 @@ USERNAME=""
 EMAIL=""
 DISPLAY_NAME=""
 ROLE="member"
-WORKSPACE_GROUP="workspace-default"
+WORKSPACE_GROUP=""
 INITIAL_PASSWORD=""
 TEMPORARY_PASSWORD="true"
 DRY_RUN="false"
@@ -32,7 +32,7 @@ Required:
   --role VALUE            MVP product role: owner, admin, member, or guest.
 
 Options:
-  --workspace-group VALUE Group claim to assign; default: workspace-default.
+  --workspace-group VALUE Group claim to assign; default: role-mapped workspace-owners/admins/members/guests.
   --password VALUE        Initial password. If omitted, a local/dev password is generated.
   --permanent-password    Mark the initial password as non-temporary. Default is temporary.
   --tenant-realm VALUE    Keycloak realm. Default: TF_VAR_tenant_slug or weave.
@@ -97,13 +97,26 @@ validate_role() {
   esac
 }
 
+default_group_for_role() {
+  case "${ROLE}" in
+    owner) printf '%s\n' 'workspace-owners' ;;
+    admin) printf '%s\n' 'workspace-admins' ;;
+    member) printf '%s\n' 'workspace-members' ;;
+    guest) printf '%s\n' 'workspace-guests' ;;
+    *) fail "Invalid role '${ROLE}'. Expected one of: owner, admin, member, guest." ;;
+  esac
+}
+
 validate_inputs() {
   [[ -n "${USERNAME}" ]] || fail "--username is required"
   [[ -n "${EMAIL}" ]] || fail "--email is required"
   [[ -n "${DISPLAY_NAME}" ]] || fail "--display-name is required"
-  [[ -n "${WORKSPACE_GROUP}" ]] || fail "--workspace-group must not be empty"
   [[ -n "${TENANT_REALM}" ]] || fail "--tenant-realm must not be empty"
   validate_role
+  if [[ -z "${WORKSPACE_GROUP}" ]]; then
+    WORKSPACE_GROUP="$(default_group_for_role)"
+  fi
+  [[ -n "${WORKSPACE_GROUP}" ]] || fail "--workspace-group must not be empty"
 }
 
 generate_password() {

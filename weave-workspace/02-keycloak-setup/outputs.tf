@@ -69,3 +69,13 @@ output "test_user_password" {
   value       = module.tenant_identity.test_user_password
   sensitive   = true
 }
+
+output "weave_product_roles" {
+  description = "MVP product realm roles exposed through the default roles scope."
+  value       = module.tenant_identity.weave_product_roles
+}
+
+output "weave_product_role_groups" {
+  description = "Default Keycloak groups mapped one-to-one to MVP product roles."
+  value       = module.tenant_identity.weave_product_role_groups
+}

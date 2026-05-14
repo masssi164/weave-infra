@@ -69,3 +69,13 @@ output "test_user_password" {
   value       = var.create_test_user ? local.test_user.password : null
   sensitive   = true
 }
+
+output "weave_product_roles" {
+  description = "MVP product realm roles exposed through the default roles scope."
+  value       = sort(keys(keycloak_role.weave_product))
+}
+
+output "weave_product_role_groups" {
+  description = "Default Keycloak groups mapped one-to-one to MVP product roles."
+  value       = local.weave_product_role_groups
+}
