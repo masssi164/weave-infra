@@ -206,7 +206,7 @@ persist_bootstrap_env() {
     printf 'export WEAVE_NEXTCLOUD_FILES_ACTOR_TOKEN=%q\n' "${TF_VAR_nextcloud_backend_actor_token}"
     printf 'export WEAVE_NEXTCLOUD_FILES_WEBDAV_ROOT_PATH=%q\n' "/remote.php/dav/files"
     printf 'export WEAVE_CALDAV_BASE_URL=%q\n' "${TF_VAR_public_scheme}://$(public_host "${TF_VAR_nextcloud_subdomain}")$(public_port_suffix)"
-    printf 'export WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE=%q\n' "/remote.php/dav/calendars/{user}/personal/"
+    printf 'export WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE=%q\n' "/remote.php/dav/calendars/${TF_VAR_nextcloud_backend_actor_username}/personal/"
     printf 'export WEAVE_CALDAV_AUTH_MODE=%q\n' "BASIC"
     printf 'export WEAVE_CALDAV_BACKEND_USERNAME=%q\n' "${TF_VAR_nextcloud_backend_actor_username}"
     printf 'export WEAVE_CALDAV_BACKEND_TOKEN=%q\n' "${TF_VAR_nextcloud_backend_actor_token}"

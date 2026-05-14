@@ -69,6 +69,8 @@ Default local names resolve to loopback; non-local installs derive the same patt
 
 The product should prefer Weave routes and backend APIs where they exist. Raw Nextcloud remains a technical/admin/protocol fallback, not the primary customer-facing files/calendar UX.
 
+The first Calendar facade slice uses the backend-owned Nextcloud actor's own `personal` CalDAV collection as a Weave-managed workspace calendar. A backend service account cannot read every user's private Nextcloud calendar merely by targeting `/calendars/{user}/personal/`; private user calendars require a later explicit sharing, provisioning, or delegated-token contract.
+
 ## Repo compass
 
 - `README.md`: product/operator overview and entry points.

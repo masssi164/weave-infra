@@ -368,7 +368,7 @@ module "backend" {
   nextcloud_files_actor_token      = var.nextcloud_backend_actor_token
   nextcloud_files_webdav_root_path = "/remote.php/dav/files"
   caldav_base_url                  = local.nextcloud_internal_base_url
-  caldav_calendar_path_template    = "/remote.php/dav/calendars/{user}/personal/"
+  caldav_calendar_path_template    = "/remote.php/dav/calendars/${var.nextcloud_backend_actor_username}/personal/"
   caldav_auth_mode                 = "BASIC"
   caldav_backend_username          = var.nextcloud_backend_actor_username
   caldav_backend_token             = var.nextcloud_backend_actor_token
