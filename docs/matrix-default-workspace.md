@@ -26,13 +26,15 @@ For a non-local tenant, replace `matrix.weave.local` with `matrix.<tenant_domain
 
 ## Provisioning credential path
 
-The current Synapse/MAS stack delegates Matrix authentication to Matrix Authentication Service (MAS), so the default workspace provisioner does **not** use Synapse shared-secret admin registration. Instead, `provision-matrix-default-workspace.sh` preflights the running MAS container, registers or refreshes the local provisioning users with `mas-cli`, and issues MAS compatibility tokens for Matrix Client-Server API room creation.
+The current Synapse/MAS stack delegates Matrix authentication to Matrix Authentication Service (MAS), so the default workspace provisioner does **not** use Synapse shared-secret admin registration. Instead, `provision-matrix-default-workspace.sh` preflights the running MAS container, registers the local provisioning users with `mas-cli`, reconciles admin policy for existing users on reruns, and issues MAS compatibility tokens for Matrix Client-Server API room creation.
+
+The generated MAS config disables password authentication (`passwords.enabled=false`). Provisioning therefore creates MAS users without `--password`/`set-password`; the room setup path authenticates only through compatibility tokens stored in the private generated bootstrap environment. MAS CLI user arguments are Matrix localparts/usernames such as `admin`, not full MXIDs such as `@admin:matrix.weave.local`.
 
 By default the MAS container is `weave-mas`. Override `WEAVE_MATRIX_MAS_CONTAINER_NAME` only if the deployment intentionally uses a different container name. If MAS is not running or the image does not provide `mas-cli`, provisioning fails before room creation with an actionable error.
 
 ## Secret handling
 
-The script stores generated Matrix provisioner/member passwords and MAS compatibility access tokens only in the private `weave-workspace/.generated/bootstrap.env` file. It does not print Matrix passwords or access tokens. `support-bundle.sh` does not include these private values and its redaction check treats token/secret/password patterns as failures.
+The script stores MAS compatibility access tokens only in the private `weave-workspace/.generated/bootstrap.env` file. It does not print Matrix access tokens. `support-bundle.sh` does not include these private values and its redaction check treats token/secret/password patterns as failures.
 
 ## Verification
 
