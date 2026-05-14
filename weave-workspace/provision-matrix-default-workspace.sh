@@ -116,7 +116,7 @@ upsert_bootstrap_var() {
   rm -f -- "${tmp_file}"
 }
 
-api_request() {
+api_request_once() {
   local method="$1"
   local path="$2"
   local token="${3:-}"
@@ -132,6 +132,34 @@ api_request() {
   fi
 
   curl "${args[@]}" "${MATRIX_INTERNAL_URL}${path}"
+}
+
+api_request() {
+  local method="$1"
+  local path="$2"
+  local token="${3:-}"
+  local body="${4:-}"
+  local output_file="$5"
+  local attempts="${WEAVE_MATRIX_API_RETRY_ATTEMPTS:-6}"
+  local delay="${WEAVE_MATRIX_API_RETRY_DELAY_SECONDS:-2}"
+  local attempt status
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    status="$(api_request_once "${method}" "${path}" "${token}" "${body}" "${output_file}" || true)"
+    case "${status}" in
+      429|502|503|504)
+        if ((attempt < attempts)); then
+          sleep "${delay}"
+          continue
+        fi
+        ;;
+    esac
+
+    printf '%s\n' "${status}"
+    return 0
+  done
+
+  printf '%s\n' "${status:-000}"
 }
 
 mas_cli() {
@@ -181,6 +209,27 @@ validate_token() {
   user_id="$(json_get "data.get('user_id')" <"${response_file}")"
   rm -f -- "${response_file}"
   [[ "${user_id}" == "${expected_user_id}" ]]
+}
+
+wait_for_valid_token() {
+  local token="$1"
+  local expected_user_id="$2"
+  local username="$3"
+  local attempts="${WEAVE_MATRIX_TOKEN_VALIDATION_ATTEMPTS:-12}"
+  local delay="${WEAVE_MATRIX_TOKEN_VALIDATION_DELAY_SECONDS:-1}"
+  local attempt
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if validate_token "${token}" "${expected_user_id}"; then
+      return 0
+    fi
+
+    if ((attempt < attempts)); then
+      sleep "${delay}"
+    fi
+  done
+
+  fail "Matrix provisioning failed: MAS compatibility token for '${username}' was rejected by Synapse whoami after ${attempts} attempt(s). Check the MAS/Synapse delegated-auth shared secret, homeserver name '${MATRIX_HOMESERVER_NAME}', and compatibility-token scopes."
 }
 
 extract_mas_compatibility_token() {
@@ -273,6 +322,7 @@ ensure_matrix_user_token() {
   fi
 
   token="$(register_matrix_user "${localpart}" "${admin_flag}")"
+  wait_for_valid_token "${token}" "${expected_user_id}" "${localpart}"
   export "${token_var}=${token}"
   upsert_bootstrap_var "${token_var}" "${token}"
 }
@@ -424,9 +474,60 @@ PY
   put_space_state "${room_id}" 'm.space.parent' "${space_id}" "${parent_body}"
 }
 
+room_member_membership() {
+  local room_id="$1"
+  local member_user_id="$2"
+  local response_file status membership
+
+  response_file="$(mktemp)"
+  status="$(api_request GET "/_matrix/client/v3/rooms/$(url_encode "${room_id}")/state/m.room.member/$(url_encode "${member_user_id}")" "${WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN}" '' "${response_file}" || true)"
+  if [[ "${status}" == "200" ]]; then
+    membership="$(json_get "data.get('membership')" <"${response_file}")"
+    rm -f -- "${response_file}"
+    printf '%s\n' "${membership}"
+    return 0
+  fi
+
+  rm -f -- "${response_file}"
+  printf ''
+}
+
+set_room_join_rule() {
+  local room_id="$1"
+  local join_rule="$2"
+  local body
+
+  body="$(python3 - "${join_rule}" <<'PY'
+import json
+import sys
+print(json.dumps({'join_rule': sys.argv[1]}, separators=(',', ':')))
+PY
+)"
+  put_space_state "${room_id}" 'm.room.join_rules' '' "${body}"
+}
+
+join_room_as_member_request() {
+  local room_id="$1"
+  local member_token="$2"
+  local output_file="$3"
+
+  api_request POST "/_matrix/client/v3/join/$(url_encode "${room_id}")" "${member_token}" '{}' "${output_file}"
+}
+
+join_room_as_member() {
+  local room_id="$1"
+  local member_token="$2"
+  local response_file status
+
+  response_file="$(mktemp)"
+  status="$(join_room_as_member_request "${room_id}" "${member_token}" "${response_file}" || true)"
+  expect_success "${status}" "${response_file}" "joining default member to room"
+  rm -f -- "${response_file}"
+}
+
 invite_and_join_member() {
   local room_id="$1"
-  local member_user_id member_token response_file status body
+  local member_user_id member_token membership response_file status
 
   if [[ "${WEAVE_MATRIX_PROVISION_TEST_MEMBER:-false}" != "true" ]]; then
     return 0
@@ -436,22 +537,24 @@ invite_and_join_member() {
   member_token="${WEAVE_MATRIX_DEFAULT_MEMBER_ACCESS_TOKEN:-}"
   [[ -n "${member_token}" ]] || return 0
 
-  body="$(python3 - "${member_user_id}" <<'PY'
-import json
-import sys
-print(json.dumps({'user_id': sys.argv[1]}, separators=(',', ':')))
-PY
-)"
-  response_file="$(mktemp)"
-  status="$(api_request POST "/_matrix/client/v3/rooms/$(url_encode "${room_id}")/invite" "${WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN}" "${body}" "${response_file}" || true)"
-  case "${status}" in
-    200|403) ;;
-    *) fail "Matrix provisioning failed: inviting default member returned HTTP ${status}" ;;
-  esac
-  rm -f -- "${response_file}"
+  membership="$(room_member_membership "${room_id}" "${member_user_id}")"
+  if [[ "${membership}" == "join" ]]; then
+    return 0
+  fi
 
+  if [[ "${membership}" == "invite" ]]; then
+    join_room_as_member "${room_id}" "${member_token}"
+    return 0
+  fi
+
+  # Synapse's invite endpoint is heavily rate-limited on a cold local stack. For
+  # the optional smoke-test member only, briefly open the pre-provisioned room,
+  # let the member join through the normal Client-Server API, and restore the
+  # MVP default invite-only policy immediately afterwards.
+  set_room_join_rule "${room_id}" public
   response_file="$(mktemp)"
-  status="$(api_request POST "/_matrix/client/v3/join/$(url_encode "${room_id}")" "${member_token}" '{}' "${response_file}" || true)"
+  status="$(join_room_as_member_request "${room_id}" "${member_token}" "${response_file}" || true)"
+  set_room_join_rule "${room_id}" invite
   expect_success "${status}" "${response_file}" "joining default member to room"
   rm -f -- "${response_file}"
 }

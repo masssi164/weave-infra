@@ -20,17 +20,17 @@ For a non-local tenant, replace `matrix.weave.local` with `matrix.<tenant_domain
 - The configured local/dev owner/admin Matrix account localpart defaults to `TF_VAR_keycloak_admin_username` (`admin`) and is joined to the workspace space plus all default rooms.
 - `announcements` keeps `events_default=50`, so normal members cannot post by default; owner/admin can post.
 - `general` and `help` keep normal member posting enabled.
-- When `TF_VAR_create_test_user=true`, the local smoke-test Matrix member (`test`) is created and joined to `announcements`, `general`, and `help` so smoke/E2E can verify the default member path.
+- When `TF_VAR_create_test_user=true`, the local smoke-test Matrix member (`test`) is created and joined to `announcements`, `general`, and `help` so smoke/E2E can verify the default member path. To avoid Synapse's cold-stack invite rate limit, provisioning briefly opens each default room for that member's Client-Server API join and immediately restores the invite-only policy.
 - Guest auto-join is intentionally disabled. Guests require an explicit invite/resource permission until role-driven Matrix membership automation lands.
 - Full owner/admin/member/guest synchronization from Keycloak roles remains a follow-up; this slice only pre-provisions the local/dev default structures and optional smoke-test member.
 
 ## Provisioning credential path
 
-The current Synapse/MAS stack delegates Matrix authentication to Matrix Authentication Service (MAS), so the default workspace provisioner does **not** use Synapse shared-secret admin registration. Instead, `provision-matrix-default-workspace.sh` preflights the running MAS container, registers the local provisioning users with `mas-cli`, reconciles admin policy for existing users on reruns, and issues MAS compatibility tokens for Matrix Client-Server API room creation.
+The current Synapse/MAS stack delegates Matrix authentication to Matrix Authentication Service (MAS), so the default workspace provisioner does **not** use Synapse shared-secret admin registration. Instead, `provision-matrix-default-workspace.sh` preflights the running MAS container, registers the local provisioning users with `mas-cli`, reconciles admin policy for existing users on reruns, issues MAS compatibility tokens, and validates each token against Synapse `/_matrix/client/v3/account/whoami` before any Matrix Client-Server API room creation.
 
 The generated MAS config disables password authentication (`passwords.enabled=false`). Provisioning therefore creates MAS users without `--password`/`set-password`; the room setup path authenticates only through compatibility tokens stored in the private generated bootstrap environment. MAS CLI user arguments are Matrix localparts/usernames such as `admin`, not full MXIDs such as `@admin:matrix.weave.local`.
 
-By default the MAS container is `weave-mas`. Override `WEAVE_MATRIX_MAS_CONTAINER_NAME` only if the deployment intentionally uses a different container name. If MAS is not running or the image does not provide `mas-cli`, provisioning fails before room creation with an actionable error.
+By default the MAS container is `weave-mas`. Override `WEAVE_MATRIX_MAS_CONTAINER_NAME` only if the deployment intentionally uses a different container name. If MAS is not running, the image does not provide `mas-cli`, or Synapse rejects a freshly issued compatibility token, provisioning fails before room creation with an actionable error. Matrix API calls also retry transient rate-limit/service-unavailable responses.
 
 ## Secret handling
 

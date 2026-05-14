@@ -18,6 +18,10 @@ if grep -q '_synapse/admin/v1/register' <<<"${PROVISIONER_CODE}"; then
   fail "Matrix provisioner must not call Synapse shared-secret admin registration on the MAS delegated-auth stack."
 fi
 
+if grep -q '/invite' <<<"${PROVISIONER_CODE}"; then
+  fail "Matrix provisioner should avoid the heavily rate-limited invite endpoint for local smoke-test member joins."
+fi
+
 grep -q 'manage register-user' <<<"${PROVISIONER_CODE}" || fail "Matrix provisioner should register provisioning users through MAS CLI."
 grep -q 'manage issue-compatibility-token' <<<"${PROVISIONER_CODE}" || fail "Matrix provisioner should issue MAS compatibility tokens for Matrix client API provisioning."
 grep -q 'WEAVE_MATRIX_MAS_CONTAINER_NAME' <<<"${PROVISIONER_CODE}" || fail "Matrix provisioner should expose an actionable MAS container preflight."
@@ -96,6 +100,88 @@ run_register_flow() {
 
 run_register_flow fresh mct_fresh
 run_register_flow existing mct_existing
+
+run_token_validation_flow() {
+  bash -c '
+    set -euo pipefail
+    # shellcheck disable=SC1090,SC1091
+    source "$1"
+    calls_file="$(mktemp)"
+    MATRIX_HOMESERVER_NAME=matrix.weave.local
+    WEAVE_MATRIX_TOKEN_VALIDATION_ATTEMPTS=1
+    token_var=STALE_MATRIX_TOKEN
+    export STALE_MATRIX_TOKEN=mct_stale
+
+    validate_token() {
+      printf "validate %s %s\n" "$1" "$2" >>"${calls_file}"
+      [[ "$1" == "mct_replacement" && "$2" == "@admin:matrix.weave.local" ]]
+    }
+
+    register_matrix_user() {
+      printf "register %s %s\n" "$1" "$2" >>"${calls_file}"
+      printf "%s\n" "mct_replacement"
+    }
+
+    upsert_bootstrap_var() {
+      printf "upsert %s\n" "$1" >>"${calls_file}"
+    }
+
+    ensure_matrix_user_token "@admin:matrix.weave.local" "${token_var}" true
+    [[ "${STALE_MATRIX_TOKEN}" == "mct_replacement" ]] || fail "Matrix provisioner should replace persisted compatibility tokens that Synapse rejects."
+    grep -q "validate mct_stale @admin:matrix.weave.local" "${calls_file}" || fail "Matrix provisioner should validate persisted tokens with Synapse whoami."
+    grep -q "validate mct_replacement @admin:matrix.weave.local" "${calls_file}" || fail "Matrix provisioner should validate newly-issued MAS compatibility tokens before Matrix room creation."
+    grep -q "upsert STALE_MATRIX_TOKEN" "${calls_file}" || fail "Matrix provisioner should persist the validated replacement compatibility token."
+
+    rm -f -- "${calls_file}"
+  ' _ "${PROVISIONER}"
+}
+
+run_token_validation_flow
+
+MATRIX_HOMESERVER_NAME=matrix.weave.local \
+WEAVE_MATRIX_TOKEN_VALIDATION_ATTEMPTS=1 \
+WEAVE_MATRIX_TOKEN_VALIDATION_DELAY_SECONDS=0 \
+bash -c '
+  set -euo pipefail
+  # shellcheck disable=SC1090,SC1091
+  source "$1"
+  validate_token() { return 1; }
+  register_matrix_user() { printf "%s\n" mct_invalid; }
+  upsert_bootstrap_var() { :; }
+  ensure_matrix_user_token admin INVALID_MATRIX_TOKEN true
+' _ "${PROVISIONER}" >/tmp/weave-mas-invalid-token.out 2>/tmp/weave-mas-invalid-token.err && \
+  fail "Matrix provisioner should fail before room creation when Synapse rejects a freshly issued MAS compatibility token."
+grep -q 'rejected by Synapse whoami' /tmp/weave-mas-invalid-token.err || fail "Matrix provisioner should surface a token-validation error instead of a later Matrix API 401."
+rm -f /tmp/weave-mas-invalid-token.out /tmp/weave-mas-invalid-token.err
+
+run_matrix_api_retry_flow() {
+  bash -c '
+    set -euo pipefail
+    # shellcheck disable=SC1090,SC1091
+    source "$1"
+    calls_file="$(mktemp)"
+    MATRIX_INTERNAL_URL=http://127.0.0.1:48008
+    WEAVE_MATRIX_API_RETRY_ATTEMPTS=2
+    WEAVE_MATRIX_API_RETRY_DELAY_SECONDS=0
+
+    api_request_once() {
+      printf "call\n" >>"${calls_file}"
+      if [[ "$(wc -l <"${calls_file}" | tr -d " ")" == "1" ]]; then
+        printf "%s\n" "429"
+      else
+        printf "%s\n" "200"
+      fi
+    }
+
+    status="$(api_request GET /_matrix/client/v3/account/whoami mct_token "" /tmp/weave-matrix-api-retry.json)"
+    [[ "${status}" == "200" ]] || fail "Matrix provisioner should retry transient Matrix API 429 responses."
+    [[ "$(wc -l <"${calls_file}" | tr -d " ")" == "2" ]] || fail "Matrix provisioner should retry Matrix API requests exactly when rate-limited."
+
+    rm -f -- "${calls_file}" /tmp/weave-matrix-api-retry.json
+  ' _ "${PROVISIONER}"
+}
+
+run_matrix_api_retry_flow
 
 # shellcheck disable=SC2329 # register_matrix_user invokes this mock indirectly.
 mas_cli() {
