@@ -21,6 +21,11 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
+safe_tail() {
+  local file="$1"
+  tail -n 20 "${file}" 2>/dev/null | sed -E 's/(Compatibility token issued: )[[:graph:]]+/\1[redacted]/g; s/(access_token[=:] ?)[[:graph:]]+/\1[redacted]/gi; s/(token[=:] ?)[[:graph:]]+/\1[redacted]/gi; s/(password[=:] ?)[[:graph:]]+/\1[redacted]/gi'
+}
+
 load_bootstrap_env() {
   if [[ -f "${BOOTSTRAP_ENV_FILE}" ]]; then
     # shellcheck disable=SC1090
@@ -124,6 +129,26 @@ api_request() {
   curl "${args[@]}" "${MATRIX_INTERNAL_URL}${path}"
 }
 
+mas_cli() {
+  docker exec "${WEAVE_MATRIX_MAS_CONTAINER_NAME}" mas-cli --config /config/config.yaml "$@"
+}
+
+ensure_mas_cli_available() {
+  require_command docker
+
+  if ! docker inspect -f '{{.State.Running}}' "${WEAVE_MATRIX_MAS_CONTAINER_NAME}" >/dev/null 2>&1; then
+    fail "Matrix provisioning failed: MAS container '${WEAVE_MATRIX_MAS_CONTAINER_NAME}' is not running. Run install.sh until Matrix Authentication Service is healthy, or set WEAVE_MATRIX_MAS_CONTAINER_NAME to the running MAS container name."
+  fi
+
+  if [[ "$(docker inspect -f '{{.State.Running}}' "${WEAVE_MATRIX_MAS_CONTAINER_NAME}" 2>/dev/null)" != "true" ]]; then
+    fail "Matrix provisioning failed: MAS container '${WEAVE_MATRIX_MAS_CONTAINER_NAME}' is not running. Start the stack and rerun provision-matrix-default-workspace.sh."
+  fi
+
+  if ! docker exec "${WEAVE_MATRIX_MAS_CONTAINER_NAME}" mas-cli --config /config/config.yaml --help >/dev/null 2>&1; then
+    fail "Matrix provisioning failed: MAS CLI is unavailable in container '${WEAVE_MATRIX_MAS_CONTAINER_NAME}'. The current Synapse/MAS stack requires mas-cli to register provisioning users and issue compatibility tokens; check the MAS image and config mount."
+  fi
+}
+
 expect_success() {
   local status="$1"
   local description="$3"
@@ -153,56 +178,66 @@ validate_token() {
   [[ "${user_id}" == "${expected_user_id}" ]]
 }
 
+extract_mas_compatibility_token() {
+  python3 -c '
+import re
+import sys
+
+text = sys.stdin.read()
+match = re.search(r"Compatibility token issued:\s*(\S+)", text)
+if match:
+    print(match.group(1))
+    raise SystemExit(0)
+
+stripped = text.strip()
+if stripped and "\n" not in stripped and not re.search(r"\s", stripped):
+    print(stripped)
+    raise SystemExit(0)
+
+raise SystemExit(1)
+'
+}
+
 register_matrix_user() {
   local localpart="$1"
   local password="$2"
   local admin_flag="$3"
-  local response_file nonce mac body status token
+  local response_file token
+  local -a register_args issue_args admin_args password_args
 
   response_file="$(mktemp)"
-  status="$(api_request GET '/_synapse/admin/v1/register' '' '' "${response_file}" || true)"
-  expect_success "${status}" "${response_file}" "registration nonce request"
-  nonce="$(json_get "data.get('nonce')" <"${response_file}")"
 
-  mac="$(python3 - "${TF_VAR_synapse_registration_shared_secret:?Expected TF_VAR_synapse_registration_shared_secret}" "${nonce}" "${localpart}" "${password}" "${admin_flag}" <<'PY'
-import hashlib
-import hmac
-import sys
-secret, nonce, username, password, admin_flag = sys.argv[1:]
-mac = hmac.new(secret.encode('utf-8'), digestmod=hashlib.sha1)
-mac.update(nonce.encode('utf-8'))
-mac.update(b'\x00')
-mac.update(username.encode('utf-8'))
-mac.update(b'\x00')
-mac.update(password.encode('utf-8'))
-mac.update(b'\x00')
-mac.update((b'admin' if admin_flag == 'true' else b'notadmin'))
-print(mac.hexdigest())
-PY
-)"
-
-  body="$(python3 - "${nonce}" "${localpart}" "${password}" "${admin_flag}" "${mac}" <<'PY'
-import json
-import sys
-nonce, username, password, admin_flag, mac = sys.argv[1:]
-print(json.dumps({
-    'nonce': nonce,
-    'username': username,
-    'password': password,
-    'admin': admin_flag == 'true',
-    'mac': mac,
-}))
-PY
-)"
-
-  status="$(api_request POST '/_synapse/admin/v1/register' '' "${body}" "${response_file}" || true)"
-  if [[ "${status}" != "200" ]]; then
-    fail "Matrix provisioning failed: could not create or refresh Matrix user '${localpart}' (HTTP ${status}). If the user already exists, restore the matching access token in ${BOOTSTRAP_ENV_FILE} and rerun."
+  register_args=(manage register-user "${localpart}" --password "${password}" --yes --ignore-password-complexity)
+  password_args=(manage set-password "${localpart}" "${password}" --ignore-complexity)
+  if [[ "${admin_flag}" == "true" ]]; then
+    register_args+=(--admin)
+    admin_args=(manage promote-admin "${localpart}")
+    issue_args=(manage issue-compatibility-token "${localpart}" "WEAVEPROV${localpart}" --yes-i-want-to-grant-synapse-admin-privileges)
+  else
+    register_args+=(--no-admin)
+    admin_args=(manage demote-admin "${localpart}")
+    issue_args=(manage issue-compatibility-token "${localpart}" "WEAVEPROV${localpart}")
   fi
 
-  token="$(json_get "data.get('access_token')" <"${response_file}")"
+  if ! mas_cli "${register_args[@]}" >"${response_file}" 2>&1; then
+    # Existing MAS users are expected on idempotent reruns. Refresh the password when
+    # MAS allows it, but do not require password management just to issue a token.
+    mas_cli "${password_args[@]}" >"${response_file}" 2>&1 || true
+  fi
+
+  if [[ "${admin_flag}" == "true" ]] && ! mas_cli "${admin_args[@]}" >"${response_file}" 2>&1; then
+    fail "Matrix provisioning failed: could not apply MAS admin policy for '${localpart}'. Last MAS CLI output: $(safe_tail "${response_file}")"
+  elif [[ "${admin_flag}" != "true" ]]; then
+    mas_cli "${admin_args[@]}" >"${response_file}" 2>&1 || true
+  fi
+
+  if ! mas_cli "${issue_args[@]}" >"${response_file}" 2>&1; then
+    fail "Matrix provisioning failed: could not issue a MAS compatibility token for '${localpart}'. Last MAS CLI output: $(safe_tail "${response_file}")"
+  fi
+
+  token="$(extract_mas_compatibility_token <"${response_file}" || true)"
   rm -f -- "${response_file}"
-  [[ -n "${token}" ]] || fail "Matrix provisioning failed: Synapse registration did not return an access token for '${localpart}'"
+  [[ -n "${token}" ]] || fail "Matrix provisioning failed: MAS CLI did not return a compatibility token for '${localpart}'"
   printf '%s\n' "${token}"
 }
 
@@ -433,6 +468,7 @@ write_app_config_defaults() {
 
 main() {
   require_command curl
+  require_command docker
   require_command openssl
   require_command python3
 
@@ -444,6 +480,7 @@ main() {
   set_default_var TF_VAR_proxy_host_port 44443
   set_default_var TF_VAR_synapse_host_port 48008
   set_default_var TF_VAR_keycloak_admin_username admin
+  set_default_var WEAVE_MATRIX_MAS_CONTAINER_NAME weave-mas
 
   MATRIX_HOMESERVER_NAME="$(public_host "${TF_VAR_matrix_subdomain:-matrix}")"
   readonly MATRIX_HOMESERVER_NAME
@@ -459,6 +496,9 @@ main() {
   set_default_var WEAVE_MATRIX_HELP_ALIAS_LOCALPART help
   set_default_var WEAVE_MATRIX_DEFAULT_MEMBER_LOCALPART test
 
+  ensure_mas_cli_available
+
+  upsert_bootstrap_var WEAVE_MATRIX_MAS_CONTAINER_NAME "${WEAVE_MATRIX_MAS_CONTAINER_NAME}"
   upsert_bootstrap_var WEAVE_MATRIX_PROVISIONER_LOCALPART "${WEAVE_MATRIX_PROVISIONER_LOCALPART}"
   upsert_bootstrap_var WEAVE_MATRIX_PROVISIONER_PASSWORD "${WEAVE_MATRIX_PROVISIONER_PASSWORD}"
   upsert_bootstrap_var WEAVE_MATRIX_WORKSPACE_ALIAS_LOCALPART "${WEAVE_MATRIX_WORKSPACE_ALIAS_LOCALPART}"
