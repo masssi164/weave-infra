@@ -59,8 +59,29 @@ api_public_url() {
   public_url "${TF_VAR_api_subdomain:-api}"
 }
 
+host_port_from_url() {
+  local url="$1"
+  local host_port
+
+  host_port="${url#*://}"
+  host_port="${host_port%%/*}"
+  if [[ "${host_port}" != *:* ]]; then
+    case "${url%%://*}" in
+      https) host_port="${host_port}:443" ;;
+      http) host_port="${host_port}:80" ;;
+    esac
+  fi
+
+  printf '%s\n' "${host_port}"
+}
+
 curl_common_args() {
+  local url="$1"
+  local host_port
   local -a args=(--silent --show-error --fail)
+
+  host_port="$(host_port_from_url "${url}")"
+  args+=(--resolve "${host_port}:127.0.0.1")
 
   if [[ -n "${WEAVE_TLS_CA_FILE:-}" ]]; then
     args+=(--cacert "${WEAVE_TLS_CA_FILE}")
@@ -77,7 +98,7 @@ curl_json() {
 
   while IFS= read -r -d '' arg; do
     args+=("${arg}")
-  done < <(curl_common_args)
+  done < <(curl_common_args "${url}")
 
   curl "${args[@]}" "$url"
 }
@@ -98,7 +119,11 @@ matrix_room_id_by_alias() {
 
 curl_status() {
   local url="$1"
+  local host_port
   local -a args=(--silent --show-error)
+
+  host_port="$(host_port_from_url "${url}")"
+  args+=(--resolve "${host_port}:127.0.0.1")
 
   if [[ -n "${WEAVE_TLS_CA_FILE:-}" ]]; then
     args+=(--cacert "${WEAVE_TLS_CA_FILE}")

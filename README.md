@@ -128,6 +128,8 @@ bash weave-workspace/backup.sh /var/backups/weave
 bash weave-workspace/restore-smoke.sh /var/backups/weave/<weave-backup-timestamp>
 ```
 
+For Release 1 recovery evidence on the dedicated runner, manually dispatch the `CI` workflow with `confirm_power_budget_ok=true` and `run_restore_smoke=true`. That creates private backup artifacts on the runner and runs `restore-smoke.sh` without uploading secrets.
+
 - Create a redacted diagnostics bundle before sharing logs manually:
 
 ```sh

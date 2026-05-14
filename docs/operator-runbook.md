@@ -137,6 +137,21 @@ WEAVE_RESTORE_SMOKE_REPROVISION_MATRIX=true bash weave-workspace/restore-smoke.s
 
 That option re-runs the idempotent default Matrix workspace provisioner before the checks. If the deployment is badly wedged but data is safe, prefer a clean host plus restored data over ad-hoc container surgery.
 
+For Release 1 Go/No-Go evidence on the dedicated runner, manually dispatch the `CI` workflow with:
+
+- `confirm_power_budget_ok=true`
+- `run_restore_smoke=true`
+
+The workflow then bootstraps the stack, runs full-stack smoke, creates a private backup artifact set under the runner temp directory, and runs `restore-smoke.sh` against that artifact set. The backup artifacts contain secrets and are intentionally not uploaded; the workflow log is the shareable evidence. This CI path is a recovery-readiness gate, not an off-host restore substitute, so an operator-owned clean-host restore rehearsal should still be written down before production data is considered protected.
+
+For artifact-only preflight without touching a live stack, use:
+
+```bash
+WEAVE_RESTORE_SMOKE_ARTIFACTS_ONLY=true bash weave-workspace/restore-smoke.sh <backup-dir>
+```
+
+Artifact-only mode validates the backup directory shape and then exits with an explicit note that service readiness was not checked.
+
 ## 7. Stop, clean rebuild, and destructive reset
 
 Use the least destructive action that solves the problem:

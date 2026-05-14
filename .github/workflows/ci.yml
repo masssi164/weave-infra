@@ -20,6 +20,11 @@ on:
         description: "Git ref to use when building the smoke-test backend image"
         required: false
         default: "main"
+      run_restore_smoke:
+        description: "Also create private backup artifacts and run restore-smoke as Release 1 recovery evidence"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -84,16 +89,20 @@ jobs:
           bash -n weave-workspace/activate-user.sh
           bash -n weave-workspace/tests/teardown-guard-test.sh
           bash -n weave-workspace/tests/support-bundle-redaction-test.sh
+          bash -n weave-workspace/tests/restore-smoke-artifacts-test.sh
           bash -n weave-workspace/tests/matrix-provisioning-mas-cli-test.sh
           bash -n weave-workspace/tests/activate-user-helper-test.sh
           bash -n weave-workspace/tests/infra-product-contract-test.sh
-          shellcheck weave-workspace/install.sh weave-workspace/teardown.sh weave-workspace/smoke-test.sh weave-workspace/provision-matrix-default-workspace.sh weave-workspace/support-bundle.sh weave-workspace/backup.sh weave-workspace/restore-smoke.sh weave-workspace/activate-user.sh weave-workspace/tests/teardown-guard-test.sh weave-workspace/tests/support-bundle-redaction-test.sh weave-workspace/tests/matrix-provisioning-mas-cli-test.sh weave-workspace/tests/activate-user-helper-test.sh weave-workspace/tests/infra-product-contract-test.sh
+          shellcheck weave-workspace/install.sh weave-workspace/teardown.sh weave-workspace/smoke-test.sh weave-workspace/provision-matrix-default-workspace.sh weave-workspace/support-bundle.sh weave-workspace/backup.sh weave-workspace/restore-smoke.sh weave-workspace/activate-user.sh weave-workspace/tests/teardown-guard-test.sh weave-workspace/tests/support-bundle-redaction-test.sh weave-workspace/tests/restore-smoke-artifacts-test.sh weave-workspace/tests/matrix-provisioning-mas-cli-test.sh weave-workspace/tests/activate-user-helper-test.sh weave-workspace/tests/infra-product-contract-test.sh
 
       - name: Test destructive reset guardrails
         run: bash weave-workspace/tests/teardown-guard-test.sh
 
       - name: Test support bundle redaction
         run: bash weave-workspace/tests/support-bundle-redaction-test.sh
+
+      - name: Test restore-smoke artifact preflight
+        run: bash weave-workspace/tests/restore-smoke-artifacts-test.sh
 
       - name: Test Matrix provisioning uses MAS CLI
         run: bash weave-workspace/tests/matrix-provisioning-mas-cli-test.sh
@@ -175,6 +184,23 @@ jobs:
         env:
           TF_VAR_weave_backend_image: ${{ env.WEAVE_BACKEND_IMAGE }}
         run: bash weave-workspace/smoke-test.sh
+
+      - name: Create private backup artifacts for restore-smoke
+        if: ${{ inputs.run_restore_smoke == true }}
+        env:
+          WEAVE_BACKUP_DIR: ${{ runner.temp }}/weave-restore-rehearsal-backups
+        run: |
+          bash weave-workspace/backup.sh
+          backup_dir="$(find "${WEAVE_BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          echo "WEAVE_RESTORE_SMOKE_BACKUP_DIR=${backup_dir}" >> "$GITHUB_ENV"
+          echo "Created private backup artifact set for restore-smoke at ${backup_dir}"
+          echo "Backup artifacts contain secrets and are intentionally not uploaded."
+
+      - name: Run restore-smoke recovery readiness gate
+        if: ${{ inputs.run_restore_smoke == true }}
+        env:
+          WEAVE_RESTORE_SMOKE_REPROVISION_MATRIX: "true"
+        run: bash weave-workspace/restore-smoke.sh "${WEAVE_RESTORE_SMOKE_BACKUP_DIR}"
 
       - name: Dump container logs on failure
         if: failure()
