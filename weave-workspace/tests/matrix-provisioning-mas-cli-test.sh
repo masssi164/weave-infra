@@ -106,6 +106,14 @@ run_register_flow() {
     fail "Matrix provisioner should reconcile admin policy for existing MAS users on idempotent reruns."
   fi
 
+  if grep -q 'WEAVEPROV' "${calls_file}"; then
+    fail "Matrix provisioner should let MAS create/sync the compatibility-token device instead of forcing a deterministic device id."
+  fi
+
+  if ! grep -q 'issue-compatibility-token admin --yes-i-want-to-grant-synapse-admin-privileges' "${calls_file}"; then
+    fail "Matrix provisioner should issue admin compatibility tokens without overriding MAS' device id."
+  fi
+
   rm -f -- "${calls_file}"
 }
 

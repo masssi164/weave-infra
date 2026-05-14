@@ -279,11 +279,11 @@ register_matrix_user() {
   if [[ "${admin_flag}" == "true" ]]; then
     register_args+=(--admin)
     admin_args=(manage promote-admin "${username}")
-    issue_args=(manage issue-compatibility-token "${username}" "WEAVEPROV${username}" --yes-i-want-to-grant-synapse-admin-privileges)
+    issue_args=(manage issue-compatibility-token "${username}" --yes-i-want-to-grant-synapse-admin-privileges)
   else
     register_args+=(--no-admin)
     admin_args=(manage demote-admin "${username}")
-    issue_args=(manage issue-compatibility-token "${username}" "WEAVEPROV${username}")
+    issue_args=(manage issue-compatibility-token "${username}")
   fi
 
   if ! mas_cli "${register_args[@]}" >"${response_file}" 2>&1; then
