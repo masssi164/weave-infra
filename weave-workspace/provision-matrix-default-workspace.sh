@@ -238,14 +238,18 @@ import re
 import sys
 
 text = sys.stdin.read()
-match = re.search(r"Compatibility token issued:\s*(\S+)", text)
-if match:
-    print(match.group(1))
+# MAS compatibility access tokens are either new-format mct_<30 chars>_<crc>
+# tokens or legacy Synapse-style syt_* tokens. Match only token-shaped values so
+# trailing log fields/punctuation do not get persisted and later fail as inactive.
+token_pattern = r"(?:mct_[A-Za-z0-9]{30}_[A-Za-z0-9]{6}|syt_[^\s\"'"'"'<>]+)"
+labelled = re.search(r"Compatibility token issued:\s*[\"'"'"']?(" + token_pattern + r")", text)
+if labelled:
+    print(labelled.group(1).rstrip(".,;:"))
     raise SystemExit(0)
 
-stripped = text.strip()
-if stripped and "\n" not in stripped and not re.search(r"\s", stripped):
-    print(stripped)
+matches = re.findall(token_pattern, text)
+if len(matches) == 1:
+    print(matches[0].rstrip(".,;:"))
     raise SystemExit(0)
 
 raise SystemExit(1)

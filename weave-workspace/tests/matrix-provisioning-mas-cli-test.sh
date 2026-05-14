@@ -36,8 +36,19 @@ fi
 
 # shellcheck disable=SC1090,SC1091
 source "${PROVISIONER}"
-parsed_token="$(printf '%s\n' 'INFO Compatibility token issued: mct_sample compat_session.id=123' | extract_mas_compatibility_token)"
-[[ "${parsed_token}" == "mct_sample" ]] || fail "Matrix provisioner should parse MAS compatibility-token CLI output without printing secrets."
+
+VALID_TOKEN_FRESH='mct_ABCDEFGHIJKLMNOPQRSTUVWXYZabcd_ABC123'
+VALID_TOKEN_EXISTING='mct_1234567890abcdefghijklmnopqrst_UVW987'
+
+parsed_token="$(printf '%s\n' "INFO Compatibility token issued: ${VALID_TOKEN_FRESH} compat_session.id=123" | extract_mas_compatibility_token)"
+[[ "${parsed_token}" == "${VALID_TOKEN_FRESH}" ]] || fail "Matrix provisioner should parse MAS compatibility-token CLI output without printing secrets."
+
+parsed_token="$(printf '%s\n' "Compatibility token issued: \"${VALID_TOKEN_EXISTING}\"." | extract_mas_compatibility_token)"
+[[ "${parsed_token}" == "${VALID_TOKEN_EXISTING}" ]] || fail "Matrix provisioner should trim token quotes/trailing punctuation from MAS CLI output."
+
+if printf '%s\n' 'Compatibility token issued: mct_sample compat_session.id=123' | extract_mas_compatibility_token >/dev/null; then
+  fail "Matrix provisioner should reject malformed compatibility tokens instead of persisting partial CLI output."
+fi
 
 run_register_flow() {
   local mode="$1"
@@ -98,8 +109,8 @@ run_register_flow() {
   rm -f -- "${calls_file}"
 }
 
-run_register_flow fresh mct_fresh
-run_register_flow existing mct_existing
+run_register_flow fresh "${VALID_TOKEN_FRESH}"
+run_register_flow existing "${VALID_TOKEN_EXISTING}"
 
 run_token_validation_flow() {
   bash -c '
