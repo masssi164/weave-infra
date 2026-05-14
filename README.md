@@ -4,7 +4,7 @@
 
 `weave-infra` is the Docker/Terraform infrastructure for a self-hosted Weave stack. Its Release 1 job is to give operators a repeatable single-host path for identity, chat, files/calendar foundations, backend API routing, local HTTPS, verification, backups, and support diagnostics.
 
-Weave's north star is broader than this repository: accessibility-first collaboration, data sovereignty, open/self-hosted control, a credible migration path from Teams/Slack-style workspaces, and later Weaver PA/agent/connector workflows. This repo provides the operator substrate for that vision; it does not pretend Release 1 is the finished product.
+Weave's north star is broader than this repository: accessibility-first collaboration, data sovereignty, open/self-hosted control, a credible migration path from Teams/Slack-style workspaces, and a future Weaver intelligence layer for assistants, agents, automation, and connectors. This repo provides the operator substrate for that vision; it does not pretend Release 1 is the finished product.
 
 ## Release 1 scope
 
@@ -21,7 +21,7 @@ The stack provisions and configures:
 - default Matrix workspace rooms for the MVP collaboration slice
 - install, teardown, release verification, operator checks, backup/restore smoke, and support-bundle scripts
 
-Release 1 is **not** yet the full Teams/Slack replacement, multi-host HA platform, managed SaaS installer, automatic offsite backup system, or Weaver PA/agent/connectors layer. Those are future product and operations tracks.
+Release 1 is **not** yet the full Teams/Slack replacement, multi-host HA platform, managed SaaS installer, automatic offsite backup system, or Weaver intelligence layer. Those are future product and operations tracks.
 
 ## Quick start: local/dev stack
 
