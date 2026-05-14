@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
+# Mocked functions in this contract test are invoked indirectly by sourced production functions.
+# shellcheck disable=SC2317
 
 set -euo pipefail
 
