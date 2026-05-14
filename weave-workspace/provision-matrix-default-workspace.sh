@@ -42,11 +42,6 @@ set_default_var() {
   fi
 }
 
-random_base64() {
-  local bytes="$1"
-  openssl rand -base64 "${bytes}" | tr -d '\n'
-}
-
 public_port_suffix() {
   local scheme="${TF_VAR_public_scheme:-https}"
   local port="${TF_VAR_proxy_host_port:-443}"
@@ -91,8 +86,18 @@ json_get() {
   python3 -c "import json,sys; data=json.load(sys.stdin); value=${filter}; print('' if value is None else value)"
 }
 
+mas_cli_username() {
+  local value="$1"
+
+  value="${value#@}"
+  value="${value%%:*}"
+  [[ -n "${value}" ]] || fail "Matrix provisioning failed: MAS username/localpart cannot be empty."
+  printf '%s\n' "${value}"
+}
+
 matrix_user_id() {
-  local localpart="$1"
+  local localpart
+  localpart="$(mas_cli_username "$1")"
   printf '@%s:%s\n' "${localpart}" "${MATRIX_HOMESERVER_NAME}"
 }
 
@@ -198,70 +203,76 @@ raise SystemExit(1)
 '
 }
 
+mas_cli_output_indicates_existing_user() {
+  local file="$1"
+  grep -Eiq 'user already exists|username already exists|already exists' "${file}"
+}
+
 register_matrix_user() {
   local localpart="$1"
-  local password="$2"
-  local admin_flag="$3"
-  local response_file token
-  local -a register_args issue_args admin_args password_args
+  local admin_flag="$2"
+  local username response_file token user_existed
+  local -a register_args issue_args admin_args
 
+  username="$(mas_cli_username "${localpart}")"
   response_file="$(mktemp)"
+  user_existed=false
 
-  register_args=(manage register-user "${localpart}" --password "${password}" --yes --ignore-password-complexity)
-  password_args=(manage set-password "${localpart}" "${password}" --ignore-complexity)
+  # MAS password authentication is intentionally disabled in the generated config.
+  # The provisioning path only needs a MAS user row plus a compatibility token, so
+  # do not pass --password or run set-password: MAS 1.15 rejects those operations
+  # when passwords.enabled=false, leaving no user for later admin/token commands.
+  register_args=(manage register-user "${username}" --yes)
   if [[ "${admin_flag}" == "true" ]]; then
     register_args+=(--admin)
-    admin_args=(manage promote-admin "${localpart}")
-    issue_args=(manage issue-compatibility-token "${localpart}" "WEAVEPROV${localpart}" --yes-i-want-to-grant-synapse-admin-privileges)
+    admin_args=(manage promote-admin "${username}")
+    issue_args=(manage issue-compatibility-token "${username}" "WEAVEPROV${username}" --yes-i-want-to-grant-synapse-admin-privileges)
   else
     register_args+=(--no-admin)
-    admin_args=(manage demote-admin "${localpart}")
-    issue_args=(manage issue-compatibility-token "${localpart}" "WEAVEPROV${localpart}")
+    admin_args=(manage demote-admin "${username}")
+    issue_args=(manage issue-compatibility-token "${username}" "WEAVEPROV${username}")
   fi
 
   if ! mas_cli "${register_args[@]}" >"${response_file}" 2>&1; then
-    # Existing MAS users are expected on idempotent reruns. Refresh the password when
-    # MAS allows it, but do not require password management just to issue a token.
-    mas_cli "${password_args[@]}" >"${response_file}" 2>&1 || true
+    if mas_cli_output_indicates_existing_user "${response_file}"; then
+      user_existed=true
+    else
+      fail "Matrix provisioning failed: could not register MAS user '${username}'. Last MAS CLI output: $(safe_tail "${response_file}")"
+    fi
   fi
 
-  if [[ "${admin_flag}" == "true" ]] && ! mas_cli "${admin_args[@]}" >"${response_file}" 2>&1; then
-    fail "Matrix provisioning failed: could not apply MAS admin policy for '${localpart}'. Last MAS CLI output: $(safe_tail "${response_file}")"
-  elif [[ "${admin_flag}" != "true" ]]; then
+  # New users receive the requested admin flag during registration. Existing users
+  # need their policy reconciled explicitly so reruns remain idempotent.
+  if [[ "${admin_flag}" == "true" && "${user_existed}" == "true" ]] && ! mas_cli "${admin_args[@]}" >"${response_file}" 2>&1; then
+    fail "Matrix provisioning failed: could not apply MAS admin policy for '${username}'. Last MAS CLI output: $(safe_tail "${response_file}")"
+  elif [[ "${admin_flag}" != "true" && "${user_existed}" == "true" ]]; then
     mas_cli "${admin_args[@]}" >"${response_file}" 2>&1 || true
   fi
 
   if ! mas_cli "${issue_args[@]}" >"${response_file}" 2>&1; then
-    fail "Matrix provisioning failed: could not issue a MAS compatibility token for '${localpart}'. Last MAS CLI output: $(safe_tail "${response_file}")"
+    fail "Matrix provisioning failed: could not issue a MAS compatibility token for '${username}'. Last MAS CLI output: $(safe_tail "${response_file}")"
   fi
 
   token="$(extract_mas_compatibility_token <"${response_file}" || true)"
   rm -f -- "${response_file}"
-  [[ -n "${token}" ]] || fail "Matrix provisioning failed: MAS CLI did not return a compatibility token for '${localpart}'"
+  [[ -n "${token}" ]] || fail "Matrix provisioning failed: MAS CLI did not return a compatibility token for '${username}'"
   printf '%s\n' "${token}"
 }
 
 ensure_matrix_user_token() {
   local localpart="$1"
-  local password_var="$2"
-  local token_var="$3"
-  local admin_flag="$4"
-  local password token expected_user_id
+  local token_var="$2"
+  local admin_flag="$3"
+  local token expected_user_id
 
+  localpart="$(mas_cli_username "${localpart}")"
   expected_user_id="$(matrix_user_id "${localpart}")"
   token="${!token_var:-}"
   if [[ -n "${token}" ]] && validate_token "${token}" "${expected_user_id}"; then
     return 0
   fi
 
-  password="${!password_var:-}"
-  if [[ -z "${password}" ]]; then
-    password="$(random_base64 24)"
-    export "${password_var}=${password}"
-    upsert_bootstrap_var "${password_var}" "${password}"
-  fi
-
-  token="$(register_matrix_user "${localpart}" "${password}" "${admin_flag}")"
+  token="$(register_matrix_user "${localpart}" "${admin_flag}")"
   export "${token_var}=${token}"
   upsert_bootstrap_var "${token_var}" "${token}"
 }
@@ -469,7 +480,6 @@ write_app_config_defaults() {
 main() {
   require_command curl
   require_command docker
-  require_command openssl
   require_command python3
 
   load_bootstrap_env
@@ -488,7 +498,6 @@ main() {
   readonly MATRIX_INTERNAL_URL
 
   set_default_var WEAVE_MATRIX_PROVISIONER_LOCALPART "${TF_VAR_keycloak_admin_username:-admin}"
-  set_default_var WEAVE_MATRIX_PROVISIONER_PASSWORD "$(random_base64 24)"
   set_default_var WEAVE_MATRIX_WORKSPACE_ALIAS_LOCALPART weave-workspace
   set_default_var WEAVE_MATRIX_WORKSPACE_NAME "Weave Workspace"
   set_default_var WEAVE_MATRIX_ANNOUNCEMENTS_ALIAS_LOCALPART announcements
@@ -500,7 +509,6 @@ main() {
 
   upsert_bootstrap_var WEAVE_MATRIX_MAS_CONTAINER_NAME "${WEAVE_MATRIX_MAS_CONTAINER_NAME}"
   upsert_bootstrap_var WEAVE_MATRIX_PROVISIONER_LOCALPART "${WEAVE_MATRIX_PROVISIONER_LOCALPART}"
-  upsert_bootstrap_var WEAVE_MATRIX_PROVISIONER_PASSWORD "${WEAVE_MATRIX_PROVISIONER_PASSWORD}"
   upsert_bootstrap_var WEAVE_MATRIX_WORKSPACE_ALIAS_LOCALPART "${WEAVE_MATRIX_WORKSPACE_ALIAS_LOCALPART}"
   upsert_bootstrap_var WEAVE_MATRIX_WORKSPACE_NAME "${WEAVE_MATRIX_WORKSPACE_NAME}"
   upsert_bootstrap_var WEAVE_MATRIX_ANNOUNCEMENTS_ALIAS_LOCALPART "${WEAVE_MATRIX_ANNOUNCEMENTS_ALIAS_LOCALPART}"
@@ -509,16 +517,14 @@ main() {
 
   if [[ "${TF_VAR_create_test_user:-false}" == "true" ]]; then
     export WEAVE_MATRIX_PROVISION_TEST_MEMBER=true
-    set_default_var WEAVE_MATRIX_DEFAULT_MEMBER_PASSWORD "$(random_base64 24)"
     upsert_bootstrap_var WEAVE_MATRIX_DEFAULT_MEMBER_LOCALPART "${WEAVE_MATRIX_DEFAULT_MEMBER_LOCALPART}"
-    upsert_bootstrap_var WEAVE_MATRIX_DEFAULT_MEMBER_PASSWORD "${WEAVE_MATRIX_DEFAULT_MEMBER_PASSWORD}"
   fi
 
   log "Provisioning default Matrix workspace structures at ${MATRIX_INTERNAL_URL}..."
-  ensure_matrix_user_token "${WEAVE_MATRIX_PROVISIONER_LOCALPART}" WEAVE_MATRIX_PROVISIONER_PASSWORD WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN true
+  ensure_matrix_user_token "${WEAVE_MATRIX_PROVISIONER_LOCALPART}" WEAVE_MATRIX_PROVISIONER_ACCESS_TOKEN true
 
   if [[ "${WEAVE_MATRIX_PROVISION_TEST_MEMBER:-false}" == "true" ]]; then
-    ensure_matrix_user_token "${WEAVE_MATRIX_DEFAULT_MEMBER_LOCALPART}" WEAVE_MATRIX_DEFAULT_MEMBER_PASSWORD WEAVE_MATRIX_DEFAULT_MEMBER_ACCESS_TOKEN false
+    ensure_matrix_user_token "${WEAVE_MATRIX_DEFAULT_MEMBER_LOCALPART}" WEAVE_MATRIX_DEFAULT_MEMBER_ACCESS_TOKEN false
   fi
 
   workspace_id="$(ensure_room \
