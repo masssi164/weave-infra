@@ -215,6 +215,17 @@ wait_for_valid_token() {
   local token="$1"
   local expected_user_id="$2"
   local username="$3"
+
+  if try_wait_for_valid_token "${token}" "${expected_user_id}"; then
+    return 0
+  fi
+
+  fail "Matrix provisioning failed: MAS compatibility token for '${username}' was rejected by Synapse whoami after ${WEAVE_MATRIX_TOKEN_VALIDATION_ATTEMPTS:-12} attempt(s). Check the MAS/Synapse delegated-auth shared secret, homeserver name '${MATRIX_HOMESERVER_NAME}', and compatibility-token scopes."
+}
+
+try_wait_for_valid_token() {
+  local token="$1"
+  local expected_user_id="$2"
   local attempts="${WEAVE_MATRIX_TOKEN_VALIDATION_ATTEMPTS:-12}"
   local delay="${WEAVE_MATRIX_TOKEN_VALIDATION_DELAY_SECONDS:-1}"
   local attempt
@@ -229,7 +240,7 @@ wait_for_valid_token() {
     fi
   done
 
-  fail "Matrix provisioning failed: MAS compatibility token for '${username}' was rejected by Synapse whoami after ${attempts} attempt(s). Check the MAS/Synapse delegated-auth shared secret, homeserver name '${MATRIX_HOMESERVER_NAME}', and compatibility-token scopes."
+  return 1
 }
 
 extract_mas_compatibility_token() {
@@ -259,6 +270,24 @@ raise SystemExit(1)
 mas_cli_output_indicates_existing_user() {
   local file="$1"
   grep -Eiq 'user already exists|username already exists|already exists' "${file}"
+}
+
+wait_for_mas_registration_device_sync() {
+  local username="$1"
+  local seconds="${WEAVE_MATRIX_MAS_REGISTRATION_SETTLE_SECONDS:-3}"
+
+  [[ "${seconds}" =~ ^[0-9]+([.][0-9]+)?$ ]] || fail "Matrix provisioning failed: WEAVE_MATRIX_MAS_REGISTRATION_SETTLE_SECONDS must be numeric."
+  if [[ "${seconds}" == "0" || "${seconds}" == "0.0" ]]; then
+    return 0
+  fi
+
+  # MAS registers users asynchronously in Synapse and then syncs the user's
+  # device list. Issuing a compatibility token before that background sync can
+  # create a Synapse device that the pending sync immediately deletes, leaving
+  # Synapse to reject the fresh token as inactive. Let the fresh-user sync settle
+  # before minting the token used for Matrix client API provisioning.
+  log "Waiting ${seconds}s for MAS to finish Synapse user/device sync for '${username}'..." >&2
+  sleep "${seconds}"
 }
 
 register_matrix_user() {
@@ -302,6 +331,10 @@ register_matrix_user() {
     mas_cli "${admin_args[@]}" >"${response_file}" 2>&1 || true
   fi
 
+  if [[ "${user_existed}" != "true" ]]; then
+    wait_for_mas_registration_device_sync "${username}"
+  fi
+
   if ! mas_cli "${issue_args[@]}" >"${response_file}" 2>&1; then
     fail "Matrix provisioning failed: could not issue a MAS compatibility token for '${username}'. Last MAS CLI output: $(safe_tail "${response_file}")"
   fi
@@ -316,7 +349,7 @@ ensure_matrix_user_token() {
   local localpart="$1"
   local token_var="$2"
   local admin_flag="$3"
-  local token expected_user_id
+  local token expected_user_id issue_attempt issue_attempts
 
   localpart="$(mas_cli_username "${localpart}")"
   expected_user_id="$(matrix_user_id "${localpart}")"
@@ -325,10 +358,24 @@ ensure_matrix_user_token() {
     return 0
   fi
 
-  token="$(register_matrix_user "${localpart}" "${admin_flag}")"
-  wait_for_valid_token "${token}" "${expected_user_id}" "${localpart}"
-  export "${token_var}=${token}"
-  upsert_bootstrap_var "${token_var}" "${token}"
+  issue_attempts="${WEAVE_MATRIX_TOKEN_ISSUE_ATTEMPTS:-2}"
+  [[ "${issue_attempts}" =~ ^[0-9]+$ && "${issue_attempts}" -gt 0 ]] || fail "Matrix provisioning failed: WEAVE_MATRIX_TOKEN_ISSUE_ATTEMPTS must be a positive integer."
+
+  for ((issue_attempt = 1; issue_attempt <= issue_attempts; issue_attempt++)); do
+    token="$(register_matrix_user "${localpart}" "${admin_flag}")"
+    if try_wait_for_valid_token "${token}" "${expected_user_id}"; then
+      export "${token_var}=${token}"
+      upsert_bootstrap_var "${token_var}" "${token}"
+      return 0
+    fi
+
+    if ((issue_attempt < issue_attempts)); then
+      log "MAS compatibility token for '${localpart}' was inactive after validation; reissuing after MAS device sync settles..." >&2
+      sleep "${WEAVE_MATRIX_TOKEN_VALIDATION_DELAY_SECONDS:-1}"
+    fi
+  done
+
+  fail "Matrix provisioning failed: MAS compatibility token for '${localpart}' was rejected by Synapse whoami after ${WEAVE_MATRIX_TOKEN_VALIDATION_ATTEMPTS:-12} attempt(s). Check the MAS/Synapse delegated-auth shared secret, homeserver name '${MATRIX_HOMESERVER_NAME}', and compatibility-token scopes."
 }
 
 resolve_room_alias() {

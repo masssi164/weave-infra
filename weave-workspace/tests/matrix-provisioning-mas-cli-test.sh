@@ -8,6 +8,7 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 PROVISIONER="${ROOT_DIR}/provision-matrix-default-workspace.sh"
 PROVISIONER_CODE="$(grep -v '^[[:space:]]*#' "${PROVISIONER}")"
+export WEAVE_MATRIX_MAS_REGISTRATION_SETTLE_SECONDS=0
 
 fail() {
   printf '%s\n' "$*" >&2
@@ -24,6 +25,8 @@ fi
 
 grep -q 'manage register-user' <<<"${PROVISIONER_CODE}" || fail "Matrix provisioner should register provisioning users through MAS CLI."
 grep -q 'manage issue-compatibility-token' <<<"${PROVISIONER_CODE}" || fail "Matrix provisioner should issue MAS compatibility tokens for Matrix client API provisioning."
+grep -q 'WEAVE_MATRIX_MAS_REGISTRATION_SETTLE_SECONDS' <<<"${PROVISIONER_CODE}" || fail "Matrix provisioner should let fresh MAS users settle before issuing compatibility tokens."
+grep -q 'WEAVE_MATRIX_TOKEN_ISSUE_ATTEMPTS' <<<"${PROVISIONER_CODE}" || fail "Matrix provisioner should reissue compatibility tokens when MAS background device sync invalidates the first token."
 grep -q 'WEAVE_MATRIX_MAS_CONTAINER_NAME' <<<"${PROVISIONER_CODE}" || fail "Matrix provisioner should expose an actionable MAS container preflight."
 
 if grep -q -- '--username\|--device-id' <<<"${PROVISIONER_CODE}"; then
@@ -157,9 +160,54 @@ run_token_validation_flow() {
 
 run_token_validation_flow
 
+run_token_reissue_flow() {
+  bash -c '
+    set -euo pipefail
+    # shellcheck disable=SC1090,SC1091
+    source "$1"
+    calls_file="$(mktemp)"
+    MATRIX_HOMESERVER_NAME=matrix.weave.local
+    WEAVE_MATRIX_TOKEN_VALIDATION_ATTEMPTS=1
+    WEAVE_MATRIX_TOKEN_VALIDATION_DELAY_SECONDS=0
+    WEAVE_MATRIX_TOKEN_ISSUE_ATTEMPTS=2
+
+    validate_token() {
+      printf "validate %s %s\n" "$1" "$2" >>"${calls_file}"
+      [[ "$1" == "mct_second" && "$2" == "@admin:matrix.weave.local" ]]
+    }
+
+    register_matrix_user() {
+      local call_count
+      printf "register %s %s\n" "$1" "$2" >>"${calls_file}"
+      call_count="$(grep -c "^register " "${calls_file}" | tr -d " ")"
+      if [[ "${call_count}" == "1" ]]; then
+        printf "%s\n" "mct_first"
+      else
+        printf "%s\n" "mct_second"
+      fi
+    }
+
+    upsert_bootstrap_var() {
+      printf "upsert %s %s\n" "$1" "$2" >>"${calls_file}"
+    }
+
+    ensure_matrix_user_token admin REISSUED_MATRIX_TOKEN true
+    [[ "${REISSUED_MATRIX_TOKEN}" == "mct_second" ]] || fail "Matrix provisioner should persist the reissued active compatibility token."
+    [[ "$(grep -c "^register " "${calls_file}" | tr -d " ")" == "2" ]] || fail "Matrix provisioner should reissue once when the first fresh token is inactive."
+    grep -q "validate mct_first @admin:matrix.weave.local" "${calls_file}" || fail "Matrix provisioner should validate the first issued token."
+    grep -q "validate mct_second @admin:matrix.weave.local" "${calls_file}" || fail "Matrix provisioner should validate the reissued token."
+    grep -q "upsert REISSUED_MATRIX_TOKEN mct_second" "${calls_file}" || fail "Matrix provisioner should persist only the active reissued token."
+
+    rm -f -- "${calls_file}"
+  ' _ "${PROVISIONER}"
+}
+
+run_token_reissue_flow
+
 MATRIX_HOMESERVER_NAME=matrix.weave.local \
 WEAVE_MATRIX_TOKEN_VALIDATION_ATTEMPTS=1 \
 WEAVE_MATRIX_TOKEN_VALIDATION_DELAY_SECONDS=0 \
+WEAVE_MATRIX_TOKEN_ISSUE_ATTEMPTS=1 \
 bash -c '
   set -euo pipefail
   # shellcheck disable=SC1090,SC1091
