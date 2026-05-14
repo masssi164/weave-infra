@@ -49,6 +49,7 @@ Use the single-host guide and env template as the starting point for a real depl
 - [docs/release-1-single-host.md](docs/release-1-single-host.md): target shape, public contract, required inputs, TLS/image/persistence expectations, and verify flow
 - [weave-workspace/release.env.example](weave-workspace/release.env.example): operator-facing environment template
 - [docs/operator-runbook.md](docs/operator-runbook.md): install/upgrade, rotation, backup, restore, destructive reset, and triage guidance
+- [docs/calendar-caldav-external-clients.md](docs/calendar-caldav-external-clients.md): CalDAV discovery, safe external-client credential path, and blocked private-calendar/profile flows
 
 After installation, run public and host-local verification from the operator env:
 
@@ -82,6 +83,7 @@ The first Calendar facade slice uses the backend-owned Nextcloud actor's own `pe
 - `docs/release-1-single-host.md`: Release 1 single-host deployment target.
 - `docs/operator-runbook.md`: operations, backup/restore, rotation, and triage guidance.
 - `docs/matrix-default-workspace.md`: default Matrix space/room provisioning.
+- `docs/calendar-caldav-external-clients.md`: CalDAV discovery, revocable client credentials, and fail-closed Calendar profile boundaries.
 - `weave-workspace/install.sh`: end-to-end bootstrap for local and single-host runs.
 - `weave-workspace/teardown.sh`: non-destructive cleanup by default; destructive volume reset requires explicit confirmation.
 - `weave-workspace/release-verify.sh`: public endpoint verification for non-local Release 1 installs.

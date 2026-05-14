@@ -64,6 +64,17 @@ curl_status() {
   curl "${args[@]}" -o /dev/null -w '%{http_code}' "$url"
 }
 
+curl_dav_discovery_status() {
+  local url="$1"
+  local -a args=(--silent --show-error)
+
+  if [[ -n "${WEAVE_TLS_CA_FILE:-}" ]]; then
+    args+=(--cacert "${WEAVE_TLS_CA_FILE}")
+  fi
+
+  curl "${args[@]}"     --request PROPFIND     --header 'Depth: 0'     -o /dev/null     -w '%{http_code}'     "$url"
+}
+
 assert_json() {
   local json="$1"
   local jq_filter="$2"
@@ -183,6 +194,13 @@ assert_json "${backend_health}" '.status == "up"' "backend readiness should repo
 log "Checking Nextcloud public status..."
 nextcloud_status="$(curl_json "${WEAVE_NEXTCLOUD_BASE_URL}/status.php")"
 assert_json "${nextcloud_status}" '.installed == true' "Nextcloud should be installed"
+
+log "Checking Nextcloud CalDAV discovery route..."
+caldav_discovery_status="$(curl_dav_discovery_status "${WEAVE_NEXTCLOUD_BASE_URL}/remote.php/dav" || true)"
+case "${caldav_discovery_status}" in
+  207|401) ;;
+  *) fail "Release verify failed: CalDAV discovery route /remote.php/dav should reach Nextcloud without secrets (expected HTTP 401 unauthenticated or 207 if already open), got ${caldav_discovery_status}" ;;
+esac
 
 assert_backend_nextcloud_actor_config
 
