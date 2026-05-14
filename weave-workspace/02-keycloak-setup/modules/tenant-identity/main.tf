@@ -32,6 +32,20 @@ locals {
     "weave:workspace",
   ]
 
+  weave_product_roles = {
+    owner  = "Full local/dev workspace ownership for bootstrap operators."
+    admin  = "Workspace administration without owner bootstrap authority."
+    member = "Standard authenticated workspace member."
+    guest  = "Constrained guest identity for feature-flagged guest portal flows."
+  }
+
+  weave_product_role_groups = {
+    owner  = "workspace-owners"
+    admin  = "workspace-admins"
+    member = "workspace-members"
+    guest  = "workspace-guests"
+  }
+
   client_defaults = {
     enabled                             = true
     standard_flow_enabled               = false
@@ -115,6 +129,47 @@ resource "keycloak_user" "test" {
     value     = local.test_user.password
     temporary = false
   }
+}
+
+resource "keycloak_role" "weave_product" {
+  for_each = local.weave_product_roles
+
+  realm_id    = keycloak_realm.tenant.id
+  name        = each.key
+  description = each.value
+}
+
+resource "keycloak_group" "weave_product_role" {
+  for_each = local.weave_product_role_groups
+
+  realm_id = keycloak_realm.tenant.id
+  name     = each.value
+}
+
+resource "keycloak_group_roles" "weave_product_role" {
+  for_each = local.weave_product_role_groups
+
+  realm_id = keycloak_realm.tenant.id
+  group_id = keycloak_group.weave_product_role[each.key].id
+  role_ids = [keycloak_role.weave_product[each.key].id]
+}
+
+resource "keycloak_user_roles" "test_member" {
+  count = var.create_test_user ? 1 : 0
+
+  realm_id = keycloak_realm.tenant.id
+  user_id  = keycloak_user.test[0].id
+  role_ids = [keycloak_role.weave_product["member"].id]
+}
+
+resource "keycloak_user_groups" "test_member" {
+  count = var.create_test_user ? 1 : 0
+
+  realm_id = keycloak_realm.tenant.id
+  user_id  = keycloak_user.test[0].id
+  group_ids = [
+    keycloak_group.weave_product_role["member"].id,
+  ]
 }
 
 resource "keycloak_openid_client" "client" {

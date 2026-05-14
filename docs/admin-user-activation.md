@@ -3,7 +3,7 @@
 Release 1 needs a support-safe way for an operator to activate a Weave user without editing Keycloak internals by hand. The helper is intentionally local/dev oriented and maps directly to the current backend product-profile contract:
 
 - MVP realm roles: `owner`, `admin`, `member`, `guest`
-- default group claim: `workspace-default`
+- default role-mapped group claims: `workspace-owners`, `workspace-admins`, `workspace-members`, `workspace-guests`
 - backend verification path: `/api/me` or the app first-run/profile status surfaces
 
 ## Prerequisites
@@ -35,7 +35,9 @@ cd weave-workspace
   --role admin
 ```
 
-The dry run prints the realm, username, email, display name, role, group, and password mode. It does not print the password and does not contact Keycloak.
+The dry run prints the realm, username, email, display name, role, role-mapped default group, and password mode. It does not print the password and does not contact Keycloak.
+
+Guests are mapped to `workspace-guests`, not member/admin groups. Override `--workspace-group` only for an intentional local/dev policy test.
 
 ## Activate a user
 
@@ -74,7 +76,7 @@ curl -sS "$WEAVE_API_BASE_URL/me" \
 Expected evidence:
 
 - `roles` includes the selected MVP role;
-- `groups` includes `workspace-default` unless a different `--workspace-group` was used;
+- `groups` includes the role-mapped default group (`workspace-guests` for guest, `workspace-members` for member, etc.) unless a different `--workspace-group` was used;
 - profile display name/email match the activated user.
 
 ## Release boundary
