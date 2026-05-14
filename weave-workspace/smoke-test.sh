@@ -173,6 +173,14 @@ curl_status() {
     "$url"
 }
 
+curl_dav_discovery_status() {
+  local url="$1"
+  local host_port
+
+  host_port="$(host_port_from_url "${url}")"
+  curl --silent --show-error     --cacert "${CADDY_TLS_CA_FILE}"     --resolve "${host_port}:127.0.0.1"     --request PROPFIND     --header 'Depth: 0'     -o /dev/null     -w '%{http_code}'     "$url"
+}
+
 curl_location() {
   local url="$1"
   local host_port
@@ -359,6 +367,13 @@ probe_authenticated_facade "Calendar" "${access_token}" "${WEAVE_BASE_URL}/calen
 log "Checking Nextcloud OIDC bootstrap..."
 nextcloud_status="$(curl_json "${WEAVE_NEXTCLOUD_BASE_URL}/status.php")"
 assert_json "${nextcloud_status}" '.installed == true' "Nextcloud should be installed"
+
+log "Checking Nextcloud CalDAV discovery route..."
+caldav_discovery_status="$(curl_dav_discovery_status "${WEAVE_NEXTCLOUD_BASE_URL}/remote.php/dav" || true)"
+case "${caldav_discovery_status}" in
+  207|401) ;;
+  *) fail "Smoke check failed: CalDAV discovery route /remote.php/dav should reach Nextcloud without secrets (expected HTTP 401 unauthenticated or 207 if already open), got ${caldav_discovery_status}" ;;
+esac
 nextcloud_providers="$(docker exec --user www-data "${NEXTCLOUD_CONTAINER_NAME}" php occ user_oidc:providers)"
 assert_json "${nextcloud_providers}" ".identifier == \"keycloak\"" "Nextcloud should expose the Keycloak provider"
 assert_json "${nextcloud_providers}" ".clientId == \"nextcloud\"" "Nextcloud provider client ID should stay aligned"
