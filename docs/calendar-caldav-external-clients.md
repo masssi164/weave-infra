@@ -36,3 +36,14 @@ Blocked until a dedicated access model is implemented:
   - `WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE=/remote.php/dav/calendars/<backend-actor>/personal/`
   - `WEAVE_CALDAV_AUTH_MODE=BASIC` (or `BEARER` only when explicitly tested)
 - Generated no-secret app config must not include `WEAVE_CALDAV_BACKEND_TOKEN`, `WEAVE_NEXTCLOUD_FILES_ACTOR_TOKEN`, or `TF_VAR_nextcloud_backend_actor_token`.
+
+## Backend metadata contract
+
+Infra passes the backend a secret-free, fail-closed external-client contract:
+
+- `WEAVE_CALDAV_EXTERNAL_DISCOVERY_URL=https://files.<tenant-domain>/remote.php/dav`
+- `WEAVE_CALDAV_EXTERNAL_CREDENTIAL_MODE=nextcloud-login-flow-app-password`
+- `WEAVE_CALDAV_EXTERNAL_PROFILE_PASSWORD_MODE=omit`
+- `WEAVE_CALDAV_EXTERNAL_PRIVATE_USER_CALENDARS=disabled`
+
+These values are safe to mirror into app/backend setup metadata because they contain routing and policy only. They deliberately do not include backend actor usernames in URLs, app passwords, bearer tokens, or primary passwords.

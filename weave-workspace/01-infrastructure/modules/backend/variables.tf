@@ -120,6 +120,26 @@ variable "caldav_request_timeout_seconds" {
   type        = number
 }
 
+variable "caldav_external_discovery_url" {
+  description = "Secret-free public CalDAV discovery URL that backend metadata may expose to native clients."
+  type        = string
+}
+
+variable "caldav_external_credential_mode" {
+  description = "Supported credential model for external CalDAV clients. Must not imply backend actor credential reuse."
+  type        = string
+}
+
+variable "caldav_external_profile_password_mode" {
+  description = "Password handling policy for generated external CalDAV setup profiles."
+  type        = string
+}
+
+variable "caldav_external_private_user_calendars" {
+  description = "Feature flag for private user calendar exposure through external CalDAV metadata."
+  type        = string
+}
+
 variable "oidc_issuer_uri" {
   description = "OIDC issuer URI consumed by the Weave backend."
   type        = string
