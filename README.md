@@ -1,276 +1,133 @@
 # Weave Infrastructure
 
-Terraform code for a Weave stack split into two stages:
+[![CI](https://github.com/masssi164/weave-infra/actions/workflows/ci.yml/badge.svg)](https://github.com/masssi164/weave-infra/actions/workflows/ci.yml)
 
-- `weave-workspace/01-infrastructure` provisions Docker networking, runtime assets, and containers.
-- `weave-workspace/02-keycloak-setup` configures the tenant realm and OIDC clients after Keycloak is reachable.
+`weave-infra` is the Docker/Terraform infrastructure for a self-hosted Weave stack. Its Release 1 job is to give operators a repeatable single-host path for identity, chat, files/calendar foundations, backend API routing, local HTTPS, verification, backups, and support diagnostics.
 
-Both stages now follow a thin-root pattern:
+Weave's north star is broader than this repository: accessibility-first collaboration, data sovereignty, open/self-hosted control, a credible migration path from Teams/Slack-style workspaces, and a future Weaver intelligence layer for assistants, agents, automation, and connectors. This repo provides the operator substrate for that vision; it does not pretend Release 1 is the finished product.
 
-- root modules own provider setup, shared locals, generated files, and cross-module composition
-- child modules own single service domains with explicit inputs and outputs
-- `moved` blocks preserve state continuity from the earlier flat layout
-- one shared PostgreSQL container now hosts the Weave runtime databases, with Nextcloud kept in the persisted `nextcloud` schema inside the shared `weave` database for release-safe local continuity
-- Caddy terminates local HTTPS for the public service hostnames with a local CA certificate
+## Release 1 scope
 
-## Quick Start
+Release 1 targets a single Linux host with public DNS, public HTTPS, Docker Engine, Terraform, pinned images, explicit operator-managed secrets, and persistence/backups owned by the operator.
 
-Add local host entries before opening any browser-facing URL:
+The stack provisions and configures:
+
+- Caddy as the public HTTPS gateway
+- Keycloak realm, clients, scopes, and first-party Weave app contract
+- Matrix/Synapse with Matrix Authentication Service delegated auth
+- Nextcloud technical/admin/protocol surface for files and calendar backing services
+- `weave-backend` behind the canonical `api.<tenant_domain>/api` route
+- PostgreSQL runtime databases and persisted Docker volumes
+- default Matrix workspace rooms for the MVP collaboration slice
+- install, teardown, release verification, operator checks, backup/restore smoke, and support-bundle scripts
+
+Release 1 is **not** yet the full Teams/Slack replacement, multi-host HA platform, managed SaaS installer, automatic offsite backup system, or Weaver intelligence layer. Those are future product and operations tracks.
+
+## Quick start: local/dev stack
+
+Add local host entries before opening browser-facing URLs:
 
 ```text
 127.0.0.1 weave.local api.weave.local auth.weave.local files.weave.local matrix.weave.local
 ```
 
+Then bootstrap the stack:
+
 ```bash
 cd weave-workspace
 ./install.sh
 ```
 
-Run `make dev-hosts` from the repository root to print the default `/etc/hosts` line.
+`install.sh` defaults to a shared-host-safe isolated port block, runs preflight checks, generates missing local secrets and TLS material, applies both Terraform stages, waits for backend readiness, and bootstraps the Nextcloud `user_oidc` app. Generated local inputs are persisted in `weave-workspace/.generated/bootstrap.env`; a no-secrets app summary is written to `weave-workspace/.generated/app-config.env`.
 
-`install.sh` now defaults to a shared-host-safe isolated port block, runs preflight checks for Docker, host resolution, and likely port conflicts, generates secrets and local TLS certificates when they are not already exported as `TF_VAR_*`, applies both Terraform stages in order, waits for `/api/health/ready`, and bootstraps the Nextcloud `user_oidc` app.
+For deeper local details, TLS trust, port modes, smoke-test inputs, and the native app contract, see [docs/local-bootstrap.md](docs/local-bootstrap.md).
 
-For repeatable local runs, generated bootstrap inputs are persisted in `weave-workspace/.generated/bootstrap.env`, mirrored to the self-hosted runner bootstrap cache when applicable, and reused on subsequent installs unless you override them explicitly with environment variables. The installer also writes a no-secrets app configuration summary to `weave-workspace/.generated/app-config.env`.
+## Quick start: Release 1 operator path
 
-The installer probes local services through `127.0.0.1` rather than bare `localhost` so Docker port checks stay reliable on hosts where IPv6 loopback behaves differently.
+Use the single-host guide and env template as the starting point for a real deployment:
 
-## Port Modes
+- [docs/release-1-single-host.md](docs/release-1-single-host.md): target shape, public contract, required inputs, TLS/image/persistence expectations, and verify flow
+- [weave-workspace/release.env.example](weave-workspace/release.env.example): operator-facing environment template
+- [docs/operator-runbook.md](docs/operator-runbook.md): install/upgrade, rotation, backup, restore, destructive reset, and triage guidance
 
-There are now two supported port modes:
-
-- canonical single-stack ports: `80`, `443`, `8080`, `8082`, `8008`, `8083`, `8084`
-- required shared-host isolation block: `44080`, `44443`, `48080`, `48082`, `48008`, `48083`, `48084`
-
-Use the canonical ports only when Weave owns the machine's standard local ports. On any shared Docker host or self-hosted runner, use the isolated block. `install.sh` defaults to the isolated block, and `.env.example` shows both modes explicitly.
-
-If you need a clean container/network rerun on a shared host, use the runner-hygiene helper before or after bootstrap:
-
-```bash
-cd weave-workspace
-WEAVE_RUNNER_HYGIENE=true ./install.sh
-# or
-bash ./teardown.sh
-```
-
-`teardown.sh` is non-destructive by default: it removes Weave containers and the Docker network but preserves persistent Docker volumes and generated local secrets/config. This is the right path for ordinary stop/restart cleanup.
-
-A destructive local reset requires both an opt-in flag and the typed tenant/workspace slug. For the default local tenant, run it only after reading the backup guidance in `docs/operator-runbook.md#5-backup-expectations`:
-
-```bash
-cd weave-workspace
-WEAVE_REMOVE_VOLUMES=true \
-WEAVE_CONFIRM_DESTRUCTIVE_RESET=weave \
-bash ./teardown.sh
-```
-
-Before deleting volumes, the helper lists the affected data domains: Keycloak identity/session data, backend/Postgres data, Matrix/Synapse database and media, Nextcloud database/files/calendar data, Caddy/TLS state, and the exact Docker volumes. Generated `.generated/` secrets/config are not removed by the helper; back them up or delete them manually only when that is intended.
-
-## TLS Setup
-
-The public local contract is HTTPS on these hostnames:
-
-- `https://weave.local` as the Weave product gateway
-- `https://weave.local/files` (Weave product files route, not direct Nextcloud)
-- `https://weave.local/calendar` (Weave product calendar route)
-- `https://api.weave.local/api` as the canonical backend API
-- `https://auth.weave.local`
-- `https://matrix.weave.local`
-- `https://files.weave.local` as the raw Nextcloud technical/admin/protocol fallback
-
-Use the generated local CA path printed by `install.sh`, or pre-create mkcert certificates before running the installer.
-
-Generated-CA flow:
-
-1. Add the host entries shown in Quick Start to `/etc/hosts`.
-2. Run `cd weave-workspace && ./install.sh`.
-3. Trust `weave-workspace/01-infrastructure/.generated/caddy/certs/weave-local-ca.pem` in the host operating system or browser trust store.
-4. Reopen the browser after trusting the CA.
-
-mkcert flow:
-
-```bash
-cd weave-workspace
-mkdir -p 01-infrastructure/.generated/caddy/certs
-mkcert -install
-mkcert \
-  -cert-file 01-infrastructure/.generated/caddy/certs/weave.local.pem \
-  -key-file 01-infrastructure/.generated/caddy/certs/weave.local-key.pem \
-  weave.local api.weave.local auth.weave.local files.weave.local matrix.weave.local
-cp "$(mkcert -CAROOT)/rootCA.pem" 01-infrastructure/.generated/caddy/certs/weave-local-ca.pem
-./install.sh
-```
-
-Caddy is managed by the Terraform infrastructure stage. `weave-workspace/docker-compose.yml` mirrors the same Caddy service and mounts the generated Caddyfile plus cert directory for proxy-only iteration against an existing `weave_network`.
-
-## Layout
-
-- `README.md`: top-level usage, local bootstrap, and Release 1 operator summary.
-- `AGENTS.md`: repository navigation notes for future maintainers.
-- `Makefile`: small local operator helpers such as `make dev-hosts`.
-- `.github/workflows/ci.yml`: GitHub Actions workflow for validation checks plus full-stack smoke coverage.
-- `docs/release-1-single-host.md`: Release 1 single-host deployment target, required inputs, and operator expectations.
-- `weave-workspace/install.sh`: end-to-end bootstrap runbook for both local and single-host deployments.
-- `weave-workspace/teardown.sh`: shared-host cleanup helper for Terraform state drift and stale Docker resources.
-- `weave-workspace/smoke-test.sh`: local full-stack smoke test that requires the optional test user flow.
-- `weave-workspace/release-verify.sh`: public endpoint verification script for non-local Release 1 installs.
-- `weave-workspace/operator-check.sh`: host-local operational check for core containers plus loopback/public health.
-- `weave-workspace/release.env.example`: operator-facing env template for single-host Release 1 deployments.
-- `docs/operator-runbook.md`: install, verify, rotate, backup, restore, and triage guidance for Release 1 operators.
-- `weave-workspace/.env.example`: hostname, port, and Caddy mount defaults for local operators.
-- `weave-workspace/docker-compose.yml`: Caddy service definition for proxy-only iteration.
-- `weave-workspace/01-infrastructure`: Docker and generated runtime configuration stage.
-- `weave-workspace/02-keycloak-setup`: Keycloak identity configuration stage.
-- `*/AGENTS.md`: directory-level maintenance summaries for faster onboarding.
-
-The infrastructure stage currently materializes these PostgreSQL databases inside the shared `weave-db` instance:
-
-- `<db_name>_keycloak`
-- `<db_name>_mas`
-- `<db_name>_synapse`
-- `<db_name>` (Nextcloud stores its tables in schema `nextcloud` here)
-
-The Weave backend is deployed as `weave-backend` and routed canonically through `api.<tenant_domain>/api`. It is configured with the public tenant Keycloak issuer, an internal Docker-network JWKS URI, a required `weave-app` token audience, and expected client ID `weave-app`. The backend also receives server-side Nextcloud files/calendar actor configuration from `TF_VAR_nextcloud_backend_actor_username` and `TF_VAR_nextcloud_backend_actor_token`; `install.sh` provisions that local/dev Nextcloud user idempotently and stores the token only in the private bootstrap env. The default local image tag is `weave-backend:local`; set `TF_VAR_weave_backend_image` to a locally built tag or pinned release digest for deterministic validation. The full-stack smoke/live-stack CI paths are manual-only. They build the backend image from the selected backend ref before bootstrapping infra only after the workflow dispatcher confirms the solar/storage/power budget is acceptable. A future optional Home Assistant preflight may query local sensors, but this repository does not assume HA secrets.
-
-The Matrix stack uses Matrix Authentication Service delegated auth through MAS' modern Synapse adapter. Keep the default MAS image unless an override has been checked against the generated `synapse_modern` config and `on_conflict: set` localpart policy. Keep `TF_VAR_synapse_image` on Synapse 1.136.0 or later so MAS can provision and link users through the homeserver MAS API.
-
-`install.sh` also idempotently provisions the MVP default Matrix workspace: one `Weave Workspace` space plus `announcements`, `general`, and `help` rooms. Stable local aliases are `#weave-workspace:matrix.weave.local`, `#announcements:matrix.weave.local`, `#general:matrix.weave.local`, and `#help:matrix.weave.local`; see `docs/matrix-default-workspace.md` for non-local alias derivation, access policy, and current role-automation follow-ups.
-
-If that backend image is private in GHCR, authenticate the Docker client before running `install.sh` or `smoke-test.sh`. The consumer side should use an explicit `docker login ghcr.io` step or a CI login action rather than relying on an ambient cached session.
-
-## Release 1 target
-
-The first non-local Release 1 target is a single Linux host with public DNS, public HTTPS, Docker Engine, Terraform, and operator-managed secrets.
-
-That target is documented in `docs/release-1-single-host.md` and is intentionally distinct from the local developer flow:
-
-- local development may use generated secrets, a generated local CA, and an optional test user
-- Release 1 should use explicit secrets, publicly trusted certificates, pinned images, and `TF_VAR_create_test_user=false`
-- local smoke coverage depends on the test user contract, while release verification uses public endpoint checks only
-
-Use `weave-workspace/release.env.example` as the starting point for a real deployment env file.
-
-## Validation
-
-Current validation flow:
-
-- `terraform -chdir=weave-workspace/01-infrastructure validate`
-- `terraform -chdir=weave-workspace/02-keycloak-setup validate`
-- `terraform -chdir=weave-workspace/01-infrastructure plan -refresh=false`
-- `bash -n weave-workspace/install.sh`
-- `bash weave-workspace/install.sh`
-- `bash weave-workspace/smoke-test.sh`
-
-GitHub Actions runs repository-safe validation on pushes and pull requests through `.github/workflows/ci.yml`. The Docker-backed full-stack smoke job is intentionally manual-only (`workflow_dispatch`) and requires the dispatcher to confirm the solar/storage/power budget before it starts.
-
-For non-local Release 1 installs, run:
+After installation, run public and host-local verification from the operator env:
 
 ```bash
 bash weave-workspace/release-verify.sh
 bash weave-workspace/operator-check.sh
 ```
 
-with `WEAVE_API_BASE_URL` (or legacy-compatible `WEAVE_BASE_URL`), `WEAVE_OIDC_ISSUER_URL`, `WEAVE_NEXTCLOUD_BASE_URL`, and `WEAVE_MATRIX_HOMESERVER_URL` exported from your operator env file.
+## Public contract
 
-`release-verify.sh` confirms the public Release 1 contract. `operator-check.sh` adds host-local checks for the managed containers plus loopback service health so operators can distinguish public routing failures from service failures.
+Default local names resolve to loopback; non-local installs derive the same pattern from `<tenant_domain>`:
 
-## Local Hostnames
+- `https://<tenant_domain>`: Weave product gateway, including `/files` and `/calendar` product routes
+- `https://api.<tenant_domain>/api`: canonical backend API origin
+- `https://auth.<tenant_domain>`: Keycloak
+- `https://matrix.<tenant_domain>`: Matrix/Synapse and MAS behind the matrix hostname
+- `https://files.<tenant_domain>`: raw Nextcloud technical/admin/protocol fallback
 
-The stack expects these names to resolve to `127.0.0.1`:
+The product should prefer Weave routes and backend APIs where they exist. Raw Nextcloud remains a technical/admin/protocol fallback, not the primary customer-facing files/calendar UX.
 
-- `<tenant_domain>` for the Weave product gateway, including `/files` and `/calendar` product routes
-- `api.<tenant_domain>` for the canonical backend API origin
-- `auth.<tenant_domain>`
-- `matrix.<tenant_domain>`
-- `files.<tenant_domain>` for the raw Nextcloud technical/admin/protocol fallback
+## Repo compass
 
-Default `/etc/hosts` line:
+- `README.md`: product/operator overview and entry points.
+- `AGENTS.md`: repository navigation notes for maintainers.
+- `Makefile`: local helper targets such as `make dev-hosts` and `make smoke`.
+- `.github/workflows/ci.yml`: Terraform/shell validation plus manual full-stack smoke.
+- `KEYCLOAK_CONTRACT.md`: realm, client, scope, claim, and audience contract.
+- `docs/local-bootstrap.md`: local port modes, TLS trust, integration test inputs, and native app contract.
+- `docs/release-1-single-host.md`: Release 1 single-host deployment target.
+- `docs/operator-runbook.md`: operations, backup/restore, rotation, and triage guidance.
+- `docs/matrix-default-workspace.md`: default Matrix space/room provisioning.
+- `weave-workspace/install.sh`: end-to-end bootstrap for local and single-host runs.
+- `weave-workspace/teardown.sh`: non-destructive cleanup by default; destructive volume reset requires explicit confirmation.
+- `weave-workspace/release-verify.sh`: public endpoint verification for non-local Release 1 installs.
+- `weave-workspace/operator-check.sh`: host-local container and health checks.
+- `weave-workspace/backup.sh`, `restore-smoke.sh`, `support-bundle.sh`: minimum operator support and recovery helpers.
+- `weave-workspace/01-infrastructure`: Docker runtime, generated config, and service modules.
+- `weave-workspace/02-keycloak-setup`: Keycloak tenant configuration stage.
 
-```text
-127.0.0.1 weave.local api.weave.local auth.weave.local files.weave.local matrix.weave.local
+## Validation
+
+Repository-safe validation used by CI:
+
+```bash
+terraform -chdir=weave-workspace/01-infrastructure validate
+terraform -chdir=weave-workspace/02-keycloak-setup validate
+terraform -chdir=weave-workspace/01-infrastructure plan -refresh=false
+bash -n weave-workspace/install.sh
 ```
 
-MAS is served behind the matrix hostname; no separate `mas.<tenant_domain>` entry is needed.
+Local/full-stack validation when Docker and the optional test user flow are available:
 
-## Operator runbook
+```bash
+TF_VAR_create_test_user=true bash weave-workspace/install.sh
+bash weave-workspace/smoke-test.sh
+```
 
-For the Release 1 operator layer, including secrets rotation expectations, backup scope, restore order, and routine triage commands, use `docs/operator-runbook.md`.
+GitHub Actions runs deterministic repository checks on pushes and pull requests. The Docker-backed full-stack smoke job is manual-only (`workflow_dispatch`) and asks the dispatcher to confirm the solar/storage/power budget before it starts.
 
-### Backup and restore smoke
+## Operator safety notes
 
-Create an operator-owned backup artifact set before destructive maintenance:
+- `teardown.sh` is non-destructive by default: it removes Weave containers/network but preserves persistent Docker volumes and generated local secrets/config.
+- Destructive local reset requires both `WEAVE_REMOVE_VOLUMES=true` and `WEAVE_CONFIRM_DESTRUCTIVE_RESET=<tenant/workspace slug>`.
+- Create an operator-owned backup before destructive maintenance:
 
 ```sh
 bash weave-workspace/backup.sh /var/backups/weave
 ```
 
-The backup directory contains raw databases, volume archives, and generated config/secrets. Keep it private and do not attach it to support issues. After restoring or cleanly reprovisioning from those artifacts, run the non-destructive recovery smoke:
+- Run restore smoke after restoring or cleanly reprovisioning from backup artifacts:
 
 ```sh
 bash weave-workspace/restore-smoke.sh /var/backups/weave/<weave-backup-timestamp>
 ```
 
-The restore smoke verifies backend readiness, Keycloak discovery, Matrix/MAS discovery, default Matrix room aliases, and raw Nextcloud readiness. It does not restore data or delete volumes.
-
-### Support bundle
-
-When you need to ask for help, create a redacted diagnostics bundle before sharing logs manually:
+- Create a redacted diagnostics bundle before sharing logs manually:
 
 ```sh
 bash weave-workspace/support-bundle.sh
 ```
 
-The bundle includes public URL/config summaries, container/service status, recent service logs, disk/volume summaries, and optional operator-check/release-verify output when `WEAVE_SUPPORT_BUNDLE_RUN_CHECKS=true` is set. It redacts common secret patterns and fails if obvious tokens, passwords, cookies, authorization headers, or private keys remain. A support bundle is **not** a backup; follow `docs/operator-runbook.md#5-backup-expectations` for backup/restore.
-
-## Integration Tests
-
-Integration tests should call the backend through the Caddy proxy URL, not the direct backend container port. For the default local stack:
-
-```bash
-export WEAVE_API_BASE_URL=https://api.weave.local/api
-export WEAVE_BASE_URL=https://api.weave.local/api
-export WEAVE_OIDC_ISSUER_URL=https://auth.weave.local/realms/weave
-export WEAVE_OIDC_CLIENT_ID=weave-app
-export WEAVE_TEST_USERNAME=test@weave.local
-export WEAVE_TEST_PASSWORD='<generated — see install.sh output or bootstrap.env>'
-```
-
-`WEAVE_API_BASE_URL` (mirrored as legacy-compatible `WEAVE_BASE_URL`) must match the canonical Caddy API route under `api.<tenant_domain>/api`. `WEAVE_OIDC_ISSUER_URL` must match the public Keycloak issuer used in access tokens. When `TF_VAR_create_test_user=true`, `install.sh` also writes these `WEAVE_*` values to `weave-workspace/.generated/bootstrap.env`.
-
-For local app/runtime configuration without secrets, source or inspect `weave-workspace/.generated/app-config.env`. It includes the product gateway, backend API, auth issuer, Matrix homeserver, Weave product files/calendar routes, and a clearly labeled `WEAVE_NEXTCLOUD_TECHNICAL_BASE_URL` for raw Nextcloud admin/protocol fallback only. It intentionally omits the backend-owned Nextcloud actor token; use the private `weave-workspace/.generated/bootstrap.env` only for local backend/server-side runs that need those secrets.
-
-The test user is disabled by default. Enable it only for local integration testing and smoke validation:
-
-```bash
-cd weave-workspace
-TF_VAR_create_test_user=true ./install.sh
-./smoke-test.sh
-```
-
-Or from the repository root:
-
-```bash
-TF_VAR_create_test_user=true bash weave-workspace/install.sh
-make smoke
-```
-
-## Native App Contract
-
-The default Keycloak client contract for the Weave mobile app is:
-
-- Keycloak display name: `weave-app`
-- OIDC client ID: `weave-app`
-- sign-in redirect URI: `com.massimotter.weave:/oauthredirect`
-- post-logout redirect URI: `com.massimotter.weave:/logout`
-- default API scope: `weave:workspace`
-- Resource Owner Password Grant: disabled by default, enabled only when `TF_VAR_create_test_user=true`
-
-The backend resource server contract is:
-
-- issuer URI: `https://auth.weave.local/realms/weave`
-- JWKS URI: `http://weave-keycloak:8080/realms/weave/protocol/openid-connect/certs`
-- required audience: `weave-app`
-- expected client ID / authorized party: `weave-app`
-- public readiness endpoint: `https://api.weave.local/api/health/ready`
-- direct readiness endpoint: `http://127.0.0.1:8084/api/health/ready`
-
-See `KEYCLOAK_CONTRACT.md` for the full realm, client, scope, claim, and audience contract.
+Support bundles are not backups. Keep backup artifacts private; they contain databases, volume archives, and generated config/secrets.
