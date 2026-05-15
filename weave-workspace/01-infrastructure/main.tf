@@ -388,6 +388,7 @@ module "backend" {
   interop_slack_enabled                  = false
   interop_teams_enabled                  = false
   connectors_public_sdk_enabled          = false
+  boards_preview_runtime_enabled         = var.boards_preview_runtime_enabled
   oidc_issuer_uri                        = local.keycloak_issuer_url
   oidc_jwk_set_uri                       = local.keycloak_jwk_set_uri
   oidc_required_audience                 = local.weave_backend_audience

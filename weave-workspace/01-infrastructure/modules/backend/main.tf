@@ -50,6 +50,7 @@ resource "docker_container" "this" {
     "WEAVE_INTEROP_SLACK_ENABLED=${var.interop_slack_enabled}",
     "WEAVE_INTEROP_TEAMS_ENABLED=${var.interop_teams_enabled}",
     "WEAVE_CONNECTORS_PUBLIC_SDK_ENABLED=${var.connectors_public_sdk_enabled}",
+    "WEAVE_BOARDS_PREVIEW_RUNTIME_ENABLED=${var.boards_preview_runtime_enabled}",
   ]
 
   ports {
