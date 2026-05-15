@@ -160,6 +160,11 @@ variable "connectors_public_sdk_enabled" {
   type        = bool
 }
 
+variable "boards_preview_runtime_enabled" {
+  description = "Enable the hidden backend Boards/Tasks preview facade. Keep false by default; live E2E may enable it explicitly to prove the guarded preview path."
+  type        = bool
+}
+
 variable "oidc_issuer_uri" {
   description = "OIDC issuer URI consumed by the Weave backend."
   type        = string

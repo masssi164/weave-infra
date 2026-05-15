@@ -181,6 +181,12 @@ variable "connector_provider_callbacks_exposed" {
   default     = false
 }
 
+variable "boards_preview_runtime_enabled" {
+  description = "Enable the hidden backend Boards/Tasks preview facade. Defaults false; expensive live feature-proof runs may set true to validate the guarded active-preview path."
+  type        = bool
+  default     = false
+}
+
 variable "postgres_image" {
   description = "PostgreSQL image used for the shared database."
   type        = string
