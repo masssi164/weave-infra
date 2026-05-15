@@ -52,6 +52,7 @@ TF_VAR_tenant_domain=weave.local
 TF_VAR_public_scheme=https
 TF_VAR_keycloak_admin_password=super-secret-admin
 TF_VAR_nextcloud_backend_actor_token=super-secret-token
+TF_VAR_interop_slack_signing_secret=slack-signing-secret
 WEAVE_API_BASE_URL=https://api.weave.local/api
 WEAVE_OIDC_ISSUER_URL=https://auth.weave.local/realms/weave
 ENV
@@ -59,6 +60,8 @@ cat >"${app_config_env}" <<'ENV'
 WEAVE_PUBLIC_BASE_URL=https://weave.local
 WEAVE_NEXTCLOUD_BASE_URL=https://files.weave.local
 WEAVE_CALDAV_BACKEND_TOKEN=calendar-token
+WEAVE_INTEROP_SLACK_TOKEN_REF=slack-token-ref
+WEAVE_INTEROP_SLACK_CLIENT_SECRET_REF=slack-client-secret-ref
 ENV
 
 (
@@ -82,9 +85,9 @@ grep -Fq 'This bundle is for support-safe diagnostics only. It is not a backup' 
 grep -Fq 'TF_VAR_tenant_domain=weave.local' "${extracted}/config/public-env-summary.env"
 grep -Fq 'WEAVE_API_BASE_URL=https://api.weave.local/api' "${extracted}/config/public-env-summary.env"
 
-if grep -R -Fq 'super-secret' "${extracted}" || grep -R -Fq 'calendar-token' "${extracted}"; then
+if grep -R -Fq 'super-secret' "${extracted}" || grep -R -Fq 'calendar-token' "${extracted}" || grep -R -Fq 'slack-signing-secret' "${extracted}" || grep -R -Fq 'slack-client-secret-ref' "${extracted}"; then
   echo "support bundle leaked a test secret" >&2
-  grep -R -n -E 'super-secret|calendar-token' "${extracted}" >&2 || true
+  grep -R -n -E 'super-secret|calendar-token|slack-signing-secret|slack-client-secret-ref' "${extracted}" >&2 || true
   exit 1
 fi
 

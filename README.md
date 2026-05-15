@@ -50,6 +50,7 @@ Use the single-host guide and env template as the starting point for a real depl
 - [weave-workspace/release.env.example](weave-workspace/release.env.example): operator-facing environment template
 - [docs/operator-runbook.md](docs/operator-runbook.md): install/upgrade, rotation, backup, restore, destructive reset, and triage guidance
 - [docs/calendar-caldav-external-clients.md](docs/calendar-caldav-external-clients.md): CalDAV discovery, safe external-client credential path, and blocked private-calendar/profile flows
+- [docs/connector-runtime-guardrails.md](docs/connector-runtime-guardrails.md): disabled-by-default connector runtime, provider callback, secret, and support-bundle guardrails
 
 After installation, run public and host-local verification from the operator env:
 

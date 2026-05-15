@@ -46,6 +46,10 @@ resource "docker_container" "this" {
     "WEAVE_CALDAV_EXTERNAL_CREDENTIAL_MODE=${var.caldav_external_credential_mode}",
     "WEAVE_CALDAV_EXTERNAL_PROFILE_PASSWORD_MODE=${var.caldav_external_profile_password_mode}",
     "WEAVE_CALDAV_EXTERNAL_PRIVATE_USER_CALENDARS=${var.caldav_external_private_user_calendars}",
+    "WEAVE_INTEROP_ENABLED=${var.interop_enabled}",
+    "WEAVE_INTEROP_SLACK_ENABLED=${var.interop_slack_enabled}",
+    "WEAVE_INTEROP_TEAMS_ENABLED=${var.interop_teams_enabled}",
+    "WEAVE_CONNECTORS_PUBLIC_SDK_ENABLED=${var.connectors_public_sdk_enabled}",
   ]
 
   ports {
