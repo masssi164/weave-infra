@@ -22,7 +22,7 @@ For a non-local tenant, replace `matrix.weave.local` with `matrix.<tenant_domain
 - `general` and `help` keep normal member posting enabled.
 - When `TF_VAR_create_test_user=true`, the local smoke-test Matrix member (`test`) is created and joined to `announcements`, `general`, and `help` so smoke/E2E can verify the default member path. To avoid Synapse's cold-stack invite rate limit, provisioning briefly opens each default room for that member's Client-Server API join and immediately restores the invite-only policy.
 - Guest auto-join is intentionally disabled. Guests require an explicit invite/resource permission until role-driven Matrix membership automation lands.
-- Keycloak emits distinct owner/admin/member/guest realm roles and role-mapped workspace groups for backend/app policy checks. Matrix room membership is still intentionally not synchronized from those roles in Release 1; this slice only pre-provisions the local/dev default structures and optional smoke-test member.
+- Keycloak emits distinct owner/admin/member/guest realm roles and role-mapped workspace groups for backend/app policy checks. Matrix room membership is still intentionally not synchronized from those roles in operator baseline; this slice only pre-provisions the local/dev default structures and optional smoke-test member.
 
 ## Provisioning credential path
 

@@ -64,7 +64,7 @@ usage() {
   cat <<USAGE
 Usage: bash weave-workspace/support-bundle.sh [output-dir]
 
-Creates a redacted support bundle for Release 1 diagnostics.
+Creates a redacted support bundle for diagnostics.
 The bundle is a triage artifact, not a backup.
 
 Environment:
@@ -244,7 +244,7 @@ create_bundle() {
   mkdir -p "${WORK_DIR}"
 
   cat >"${WORK_DIR}/README.txt" <<MSG
-Weave Release 1 support bundle
+Weave support bundle
 Created UTC: ${CREATED_AT}
 
 This bundle is for support-safe diagnostics only. It is not a backup and cannot restore

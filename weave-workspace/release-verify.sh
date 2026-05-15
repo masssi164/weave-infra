@@ -145,8 +145,8 @@ assert_backend_nextcloud_actor_config() {
   [[ "${caldav_base_url}" == "${backend_nextcloud_base_url}" ]] || fail "Release verify failed: CalDAV base URL should match the backend Nextcloud adapter base URL"
 
   caldav_template="$(container_env_value weave-backend WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE)"
-  [[ "${caldav_template}" != *"{user}"* ]] || fail "Release verify failed: CalDAV calendar path template must target the backend actor workspace calendar, not unresolved user-private calendars"
-  [[ "${caldav_template}" == "/remote.php/dav/calendars/${actor_username}/personal/" ]] || fail "Release verify failed: CalDAV calendar path template must target the backend actor workspace calendar"
+  [[ "${caldav_template}" != *"{user}"* ]] || fail "Release verify failed: CalDAV calendar path template must target the backend actor workspace calendar while team/channel scopes are implemented, not unresolved private personal calendars"
+  [[ "${caldav_template}" == "/remote.php/dav/calendars/${actor_username}/personal/" ]] || fail "Release verify failed: CalDAV calendar path template must target the backend actor workspace calendar while team/channel scopes are implemented"
 
   caldav_auth_mode="$(container_env_value weave-backend WEAVE_CALDAV_AUTH_MODE)"
   [[ "${caldav_auth_mode}" == "BASIC" || "${caldav_auth_mode}" == "BEARER" ]] || fail "Release verify failed: unsupported CalDAV auth mode ${caldav_auth_mode}"
@@ -167,7 +167,7 @@ assert_backend_nextcloud_actor_config() {
   [[ "${external_profile_password_mode}" == "omit" ]] || fail "Release verify failed: external CalDAV profiles must omit passwords"
 
   external_private_user_calendars="$(container_env_value weave-backend WEAVE_CALDAV_EXTERNAL_PRIVATE_USER_CALENDARS)"
-  [[ "${external_private_user_calendars}" == "disabled" ]] || fail "Release verify failed: private user CalDAV calendars must stay disabled until provisioning/sharing is tested"
+  [[ "${external_private_user_calendars}" == "disabled" ]] || fail "Release verify failed: private personal CalDAV calendars must stay disabled until provisioning/sharing is tested"
 
   docker exec --user www-data weave-nextcloud php occ user:info "${actor_username}" >/dev/null 2>&1 || \
     fail "Release verify failed: Nextcloud backend actor user is not provisioned"

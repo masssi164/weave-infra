@@ -222,7 +222,7 @@ persist_bootstrap_env() {
     printf 'export WEAVE_TARGET_DESKTOP=%q\n' "true"
     printf 'export WEAVE_TARGET_WEB=%q\n' "false"
     printf 'export WEAVE_MATRIX_FEDERATION=%q\n' "disabled"
-    printf 'export WEAVE_CHAT_E2EE=%q\n' "planned-not-enabled"
+    printf 'export WEAVE_CHAT_E2EE=%q\n' "active-architecture-gated"
   } >> "${BOOTSTRAP_ENV_FILE}"
 
   if create_test_user_enabled; then
@@ -475,7 +475,7 @@ write_app_config_summary() {
     printf 'export WEAVE_TARGET_DESKTOP=%q\n' "true"
     printf 'export WEAVE_TARGET_WEB=%q\n' "false"
     printf 'export WEAVE_MATRIX_FEDERATION=%q\n' "disabled"
-    printf 'export WEAVE_CHAT_E2EE=%q\n' "planned-not-enabled"
+    printf 'export WEAVE_CHAT_E2EE=%q\n' "active-architecture-gated"
   } > "${APP_CONFIG_ENV_FILE}"
   chmod 0644 "${APP_CONFIG_ENV_FILE}"
 }
@@ -953,7 +953,7 @@ print_summary() {
   log "- Desktop:           enabled"
   log "- Browser/Web:       later"
   log "- Matrix federation: disabled"
-  log "- Chat E2EE:         planned, not enabled"
+  log "- Chat E2EE:         active architecture, gated until encrypted-room/device validation"
   log
   log "Health checks:"
   log "- Backend ready: $(integration_test_base_url)/health/ready"

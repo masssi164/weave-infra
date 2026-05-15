@@ -34,7 +34,7 @@ usage() {
   cat <<USAGE
 Usage: bash weave-workspace/backup.sh [output-dir]
 
-Creates a Release 1 backup artifact set for operator-managed restore rehearsals.
+Creates a backup artifact set for operator-managed restore rehearsals.
 The output contains secrets and production data. It is not a support bundle and must
 not be attached to issues or shared with support.
 
@@ -70,7 +70,7 @@ require_volume() {
 
 write_manifest_header() {
   cat >"${BACKUP_DIR}/MANIFEST.txt" <<MSG
-Weave Release 1 backup
+Weave backup
 Created UTC: ${CREATED_AT}
 
 SECURITY: This directory contains secrets and user/workspace data. Keep it encrypted

@@ -1,6 +1,6 @@
 # Local/Dev Admin User Activation Helper
 
-Release 1 needs a support-safe way for an operator to activate a Weave user without editing Keycloak internals by hand. The helper is intentionally local/dev oriented and maps directly to the current backend product-profile contract:
+The operator baseline needs a support-safe way for an operator to activate a Weave user without editing Keycloak internals by hand. The helper is intentionally local/dev oriented and maps directly to the current backend product-profile contract:
 
 - MVP realm roles: `owner`, `admin`, `member`, `guest`
 - default role-mapped group claims: `workspace-owners`, `workspace-admins`, `workspace-members`, `workspace-guests`
@@ -81,4 +81,4 @@ Expected evidence:
 
 ## Release boundary
 
-This is an operator helper, not the final product admin UI/API. Release 1 may use it for local/dev owner/admin activation evidence. A later product admin flow should replace this script for non-technical workspace administrators.
+This is an operator helper, not the final product admin UI/API. The operator baseline may use it for local/dev owner/admin activation evidence. A later product admin flow should replace this script for non-technical workspace administrators.

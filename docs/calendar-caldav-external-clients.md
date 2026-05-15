@@ -1,6 +1,6 @@
 # Calendar CalDAV external clients
 
-Release 2 exposes Calendar through the Weave backend facade first. Native CalDAV clients are allowed only through secret-free discovery metadata plus user-owned, revocable credentials.
+Calendar is exposed through the Weave backend facade first. Native CalDAV clients are allowed only through secret-free discovery metadata plus user-owned, revocable credentials.
 
 ## Public discovery route
 
@@ -31,7 +31,7 @@ Blocked until a dedicated access model is implemented:
 ## Operator checks
 
 - `WEAVE_NEXTCLOUD_BASE_URL` should point to the technical Nextcloud host (`https://files...`), not the Weave product `/calendar` route.
-- Backend CalDAV adapter variables should target the backend actor workspace calendar only:
+- Backend CalDAV adapter variables should target the backend actor workspace calendar fallback while team/channel scopes are implemented:
   - `WEAVE_CALDAV_BASE_URL=$WEAVE_NEXTCLOUD_BASE_URL`
   - `WEAVE_CALDAV_CALENDAR_PATH_TEMPLATE=/remote.php/dav/calendars/<backend-actor>/personal/`
   - `WEAVE_CALDAV_AUTH_MODE=BASIC` (or `BEARER` only when explicitly tested)

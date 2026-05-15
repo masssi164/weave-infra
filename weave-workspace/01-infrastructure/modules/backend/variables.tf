@@ -136,12 +136,12 @@ variable "caldav_external_profile_password_mode" {
 }
 
 variable "caldav_external_private_user_calendars" {
-  description = "Feature flag for private user calendar exposure through external CalDAV metadata."
+  description = "Feature flag for private personal calendar exposure through external CalDAV metadata."
   type        = string
 }
 
 variable "interop_enabled" {
-  description = "Enable backend interop gateway runtime. Defaults false for Release 2 connector guardrails."
+  description = "Enable backend interop gateway runtime. Defaults false for connector preview guardrails."
   type        = bool
 }
 

@@ -26,6 +26,7 @@ assert_file_absent() {
 
 backend_main="${ROOT_DIR}/01-infrastructure/modules/backend/main.tf"
 infra_main="${ROOT_DIR}/01-infrastructure/main.tf"
+infra_outputs="${ROOT_DIR}/01-infrastructure/outputs.tf"
 install_script="${ROOT_DIR}/install.sh"
 keycloak_main="${ROOT_DIR}/02-keycloak-setup/modules/tenant-identity/main.tf"
 release_env="${ROOT_DIR}/release.env.example"
@@ -34,7 +35,7 @@ caldav_doc="${REPO_DIR}/docs/calendar-caldav-external-clients.md"
 connector_doc="${REPO_DIR}/docs/connector-runtime-guardrails.md"
 caddy_template="${ROOT_DIR}/01-infrastructure/templates/Caddyfile.tpl"
 
-for file in "${backend_main}" "${infra_main}" "${install_script}" "${keycloak_main}" "${release_env}" "${admin_doc}" "${caldav_doc}" "${connector_doc}" "${caddy_template}"; do
+for file in "${backend_main}" "${infra_main}" "${infra_outputs}" "${install_script}" "${keycloak_main}" "${release_env}" "${admin_doc}" "${caldav_doc}" "${connector_doc}" "${caddy_template}"; do
   [[ -f "${file}" ]] || fail "Missing expected contract file: ${file}"
 done
 
@@ -52,6 +53,12 @@ assert_file_contains "${install_script}" 'WEAVE_CALDAV_EXTERNAL_PROFILE_PASSWORD
 assert_file_contains "${release_env}" 'WEAVE_CALDAV_EXTERNAL_DISCOVERY_URL=https://files.weave.example/remote.php/dav'
 assert_file_absent "${caldav_doc}" 'WEAVE_CALDAV_BACKEND_TOKEN='
 assert_file_absent "${release_env}" 'WEAVE_CALDAV_BACKEND_TOKEN='
+assert_file_contains "${install_script}" 'printf '\''export WEAVE_CHAT_E2EE=%q\n'\'' "active-architecture-gated"'
+assert_file_contains "${infra_outputs}" 'WEAVE_CHAT_E2EE                              = "active-architecture-gated"'
+legacy_e2ee_marker='planned-not-'
+legacy_e2ee_marker+='enabled'
+assert_file_absent "${install_script}" "${legacy_e2ee_marker}"
+assert_file_absent "${infra_outputs}" "${legacy_e2ee_marker}"
 
 # Keycloak must declare product roles/groups, and guest must remain distinct from member/admin.
 for role in owner admin member guest; do

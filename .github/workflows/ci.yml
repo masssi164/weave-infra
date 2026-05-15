@@ -21,7 +21,7 @@ on:
         required: false
         default: "main"
       run_restore_smoke:
-        description: "Also create private backup artifacts and run restore-smoke as Release 1 recovery evidence"
+        description: "Also create private backup artifacts and run restore-smoke as recovery evidence"
         required: false
         type: boolean
         default: false

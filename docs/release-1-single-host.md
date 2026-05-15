@@ -1,11 +1,11 @@
-# Release 1 single-host deployment path
+# single-host deployment path
 
-This is the first non-local deployment target for Weave Release 1.
-It is intentionally narrower than a future HA or Kubernetes story.
+This is the first non-local deployment target for Weave operator baseline.
+It is intentionally narrower than a later HA or Kubernetes story.
 
 ## Target shape
 
-Release 1 runs on one Linux host with Docker Engine, Terraform, public DNS, and publicly trusted TLS certificates.
+The single-host baseline runs on one Linux host with Docker Engine, Terraform, public DNS, and publicly trusted TLS certificates.
 The host is the operator boundary.
 
 Services on the host:
@@ -55,13 +55,13 @@ Set these explicitly before the first apply:
 - `TF_VAR_nextcloud_backend_actor_token` for the server-side backend Files/Calendar Nextcloud actor
 - all admin, database, MAS, and backend actor secrets consumed by `install.sh`
 
-Calendar facade note: Release 1 points backend Calendar operations at the backend actor's own `personal` CalDAV collection, making it the first Weave-managed workspace calendar. Do not configure private user calendar paths unless a later contract explicitly provisions sharing or delegated user access.
+Calendar facade note: operator baseline points backend Calendar operations at the backend actor's own `personal` CalDAV collection, making it the temporary Weave-managed workspace calendar fallback while team/channel scopes are implemented. Do not configure private personal calendar paths unless a later contract explicitly provisions sharing or delegated user access.
 
 Start from `weave-workspace/release.env.example`, copy it to a local untracked file, then replace every placeholder.
 
 ## TLS source
 
-Release 1 should use publicly trusted certificates, for example Let's Encrypt or a certificate issued by your edge platform.
+The single-host baseline should use publicly trusted certificates, for example Let's Encrypt or a certificate issued by your edge platform.
 Do not rely on the generated local CA flow outside development.
 
 Recommended pattern:
@@ -73,7 +73,7 @@ Recommended pattern:
 
 ## Image source
 
-Release 1 should pin images, not rely on floating local defaults.
+The single-host baseline should pin images, not rely on floating local defaults.
 
 Minimum expectation:
 
@@ -144,9 +144,9 @@ At minimum, operators need:
 - a redacted diagnostics step using `support-bundle.sh` before sharing logs for help
 - a note explaining whether test users are forbidden or temporarily enabled in the environment
 
-Use `docs/operator-runbook.md` as the concrete Release 1 runbook for install, verification, rotation, backup, restore, and first-line triage.
+Use `docs/operator-runbook.md` as the concrete operator baseline runbook for install, verification, rotation, backup, restore, and first-line triage.
 
-## Not the Release 1 story yet
+## Not the operator baseline story yet
 
 This slice does not yet provide:
 
