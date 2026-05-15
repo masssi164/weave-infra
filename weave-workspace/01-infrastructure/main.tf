@@ -64,11 +64,17 @@ locals {
   matrix_mas_upstream_id = "01JQ7N9R4QK6W3M5X8Y2ZC1DHF"
 
   # Caddy TLS (from #3)
-  caddy_tls_cert_file = abspath(coalesce(var.caddy_tls_cert_file, "${path.module}/.generated/caddy/certs/weave.local.pem"))
-  caddy_tls_key_file  = abspath(coalesce(var.caddy_tls_key_file, "${path.module}/.generated/caddy/certs/weave.local-key.pem"))
-  caddy_tls_ca_file   = abspath(coalesce(var.caddy_tls_ca_file, "${path.module}/.generated/caddy/certs/weave-local-ca.pem"))
-  caddy_certs_dir     = dirname(local.caddy_tls_cert_file)
-  caddyfile_path      = abspath("${path.module}/.generated/caddy/Caddyfile")
+  caddy_tls_cert_file                = abspath(coalesce(var.caddy_tls_cert_file, "${path.module}/.generated/caddy/certs/weave.local.pem"))
+  caddy_tls_key_file                 = abspath(coalesce(var.caddy_tls_key_file, "${path.module}/.generated/caddy/certs/weave.local-key.pem"))
+  caddy_tls_ca_file                  = abspath(coalesce(var.caddy_tls_ca_file, "${path.module}/.generated/caddy/certs/weave-local-ca.pem"))
+  caddy_certs_dir                    = dirname(local.caddy_tls_cert_file)
+  caddyfile_path                     = abspath("${path.module}/.generated/caddy/Caddyfile")
+  connector_provider_callbacks_guard = var.connector_provider_callbacks_exposed ? "" : <<-EOCADDY
+	@connector_provider_callbacks path /api/interop/slack/oauth/callback /api/interop/slack/events
+	handle @connector_provider_callbacks {
+		respond "Connector provider callbacks are disabled by infrastructure defaults." 404
+	}
+  EOCADDY
   caddyfile_content = templatefile("${path.module}/templates/Caddyfile.tpl", {
     weave_site_addresses  = local.site_addresses.weave
     api_site_addresses    = local.site_addresses.api
@@ -82,9 +88,10 @@ locals {
     mas_upstream          = "${local.service_names.mas}:8080"
     synapse_upstream      = "${local.service_names.synapse}:8008"
     # Backend is routed via Caddy (api_upstream); no Traefik labels needed
-    api_upstream      = "${local.service_names.backend}:${var.backend_container_port}"
-    tls_cert_filename = basename(local.caddy_tls_cert_file)
-    tls_key_filename  = basename(local.caddy_tls_key_file)
+    api_upstream                       = "${local.service_names.backend}:${var.backend_container_port}"
+    tls_cert_filename                  = basename(local.caddy_tls_cert_file)
+    tls_key_filename                   = basename(local.caddy_tls_key_file)
+    connector_provider_callbacks_guard = local.connector_provider_callbacks_guard
   })
 
   # Backend / Keycloak contract: validate public iss values while fetching JWKS over the Docker network.
@@ -377,6 +384,10 @@ module "backend" {
   caldav_external_credential_mode        = "nextcloud-login-flow-app-password"
   caldav_external_profile_password_mode  = "omit"
   caldav_external_private_user_calendars = "disabled"
+  interop_enabled                        = false
+  interop_slack_enabled                  = false
+  interop_teams_enabled                  = false
+  connectors_public_sdk_enabled          = false
   oidc_issuer_uri                        = local.keycloak_issuer_url
   oidc_jwk_set_uri                       = local.keycloak_jwk_set_uri
   oidc_required_audience                 = local.weave_backend_audience

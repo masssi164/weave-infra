@@ -175,6 +175,12 @@ variable "api_upstream" {
   default     = "weave-backend:8080"
 }
 
+variable "connector_provider_callbacks_exposed" {
+  description = "Expose provider callback/webhook routes such as Slack OAuth/events through Caddy. Defaults false so connector runtime remains fail-closed until a reviewed connector rollout enables it."
+  type        = bool
+  default     = false
+}
+
 variable "postgres_image" {
   description = "PostgreSQL image used for the shared database."
   type        = string

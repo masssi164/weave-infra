@@ -25,6 +25,8 @@ ${api_site_addresses} {
 	tls /certs/${tls_cert_filename} /certs/${tls_key_filename}
 	encode zstd gzip
 
+	${connector_provider_callbacks_guard}
+
 	reverse_proxy ${api_upstream}
 }
 

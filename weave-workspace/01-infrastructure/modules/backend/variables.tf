@@ -140,6 +140,26 @@ variable "caldav_external_private_user_calendars" {
   type        = string
 }
 
+variable "interop_enabled" {
+  description = "Enable backend interop gateway runtime. Defaults false for Release 2 connector guardrails."
+  type        = bool
+}
+
+variable "interop_slack_enabled" {
+  description = "Enable Slack-specific interop runtime. Defaults false; infra must not expose Slack callbacks unless explicitly reviewed."
+  type        = bool
+}
+
+variable "interop_teams_enabled" {
+  description = "Enable Teams-specific interop runtime. Defaults false until Slack hardening proves the connector boundary."
+  type        = bool
+}
+
+variable "connectors_public_sdk_enabled" {
+  description = "Enable public connector SDK behavior. Defaults false; the public SDK is deferred until real connectors prove the boundary."
+  type        = bool
+}
+
 variable "oidc_issuer_uri" {
   description = "OIDC issuer URI consumed by the Weave backend."
   type        = string

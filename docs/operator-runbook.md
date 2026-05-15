@@ -200,6 +200,7 @@ These are still intentionally out of scope for this repo slice:
 
 - automated backup scheduling
 - secret manager integration
+- connector runtime enablement, including reviewed provider callback exposure and revocable provider secret references
 - HA or zero-downtime upgrades
 - centralized metrics or alert routing
 - fully declarative Nextcloud bootstrap beyond the supported `install.sh` path

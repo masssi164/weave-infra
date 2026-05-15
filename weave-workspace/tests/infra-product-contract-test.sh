@@ -31,8 +31,10 @@ keycloak_main="${ROOT_DIR}/02-keycloak-setup/modules/tenant-identity/main.tf"
 release_env="${ROOT_DIR}/release.env.example"
 admin_doc="${REPO_DIR}/docs/admin-user-activation.md"
 caldav_doc="${REPO_DIR}/docs/calendar-caldav-external-clients.md"
+connector_doc="${REPO_DIR}/docs/connector-runtime-guardrails.md"
+caddy_template="${ROOT_DIR}/01-infrastructure/templates/Caddyfile.tpl"
 
-for file in "${backend_main}" "${infra_main}" "${install_script}" "${keycloak_main}" "${release_env}" "${admin_doc}" "${caldav_doc}"; do
+for file in "${backend_main}" "${infra_main}" "${install_script}" "${keycloak_main}" "${release_env}" "${admin_doc}" "${caldav_doc}" "${connector_doc}" "${caddy_template}"; do
   [[ -f "${file}" ]] || fail "Missing expected contract file: ${file}"
 done
 
@@ -59,5 +61,18 @@ assert_file_contains "${keycloak_main}" 'workspace-guests'
 assert_file_contains "${keycloak_main}" 'keycloak_group_roles'
 assert_file_contains "${keycloak_main}" 'keycloak_user_roles'
 assert_file_contains "${admin_doc}" 'Guests are mapped to `workspace-guests`, not member/admin groups.'
+
+# Connector/interop runtime guardrails must default closed and keep public provider callbacks blocked.
+assert_file_contains "${backend_main}" 'WEAVE_INTEROP_ENABLED=${var.interop_enabled}'
+assert_file_contains "${backend_main}" 'WEAVE_INTEROP_SLACK_ENABLED=${var.interop_slack_enabled}'
+assert_file_contains "${backend_main}" 'WEAVE_INTEROP_TEAMS_ENABLED=${var.interop_teams_enabled}'
+assert_file_contains "${backend_main}" 'WEAVE_CONNECTORS_PUBLIC_SDK_ENABLED=${var.connectors_public_sdk_enabled}'
+assert_file_contains "${infra_main}" 'connector_provider_callbacks_exposed ? ""'
+assert_file_contains "${infra_main}" 'interop_enabled                        = false'
+assert_file_contains "${infra_main}" 'interop_slack_enabled                  = false'
+assert_file_contains "${infra_main}" 'connectors_public_sdk_enabled          = false'
+assert_file_contains "${caddy_template}" 'connector_provider_callbacks_guard'
+assert_file_contains "${connector_doc}" 'provider callback routes such as Slack OAuth and event ingestion are blocked at Caddy with `404`'
+assert_file_contains "${connector_doc}" 'do not commit demo OAuth secrets, webhook signing secrets, bot tokens, access tokens, or refresh tokens'
 
 printf '%s\n' 'infra product contract tests passed'
