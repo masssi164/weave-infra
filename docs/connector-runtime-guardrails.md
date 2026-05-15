@@ -1,6 +1,6 @@
 # Connector runtime guardrails
 
-Release 2 connector work is fail-closed by default. The infra layer may expose safe backend metadata for preview UI, but it must not expose provider webhooks, OAuth callbacks, provider tokens, refresh tokens, or static demo secrets unless a later reviewed connector issue explicitly enables them.
+Connector preview work is fail-closed by default. The infra layer may expose safe backend metadata for preview UI, but it must not expose provider webhooks, OAuth callbacks, provider tokens, refresh tokens, or static demo secrets unless a later reviewed connector issue explicitly enables them.
 
 ## Default runtime posture
 
@@ -27,4 +27,4 @@ Before exposing a provider callback route or enabling provider runtime behavior,
 2. Caddy/Terraform config that exposes only the required callback paths;
 3. revocation guidance for every provider credential involved;
 4. support-bundle redaction coverage for new env names, logs, and diagnostics;
-5. smoke/static checks proving Release 1 behavior is unchanged when connector config is absent.
+5. smoke/static checks proving core behavior is unchanged when connector config is absent.

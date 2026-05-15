@@ -54,7 +54,7 @@ output "app_config" {
     WEAVE_TARGET_DESKTOP                         = "true"
     WEAVE_TARGET_WEB                             = "false"
     WEAVE_MATRIX_FEDERATION                      = "disabled"
-    WEAVE_CHAT_E2EE                              = "planned-not-enabled"
+    WEAVE_CHAT_E2EE                              = "active-architecture-gated"
   }
 }
 

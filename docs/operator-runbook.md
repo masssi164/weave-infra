@@ -1,6 +1,6 @@
-# Release 1 operator runbook
+# Operator runbook
 
-This is the minimum operator layer for `weave-infra` Release 1.
+This is the minimum operator layer for `weave-infra` operator baseline.
 It is meant to remove the remaining tribal knowledge around install, verify, recovery, and routine maintenance.
 
 ## 1. Before install
@@ -24,7 +24,7 @@ Recommended file permissions on the host:
 
 ## 2. Secrets inventory and rotation
 
-Release 1 secrets are file-managed, not generated on the fly.
+operator baseline secrets are file-managed, not generated on the fly.
 At minimum track ownership and rotation dates for:
 
 - `TF_VAR_db_admin_password`
@@ -87,13 +87,13 @@ What `operator-check.sh` adds beyond `release-verify.sh`:
 - checks the public product, backend, auth, Matrix, and raw Nextcloud fallback routes through the configured release URLs
 - checks that the default Matrix workspace aliases resolve (`#weave-workspace`, `#announcements`, `#general`, and `#help` on the configured Matrix homeserver)
 - checks that `weave-backend` has the required server-side Files/Calendar Nextcloud actor env and that the actor user exists in Nextcloud
-- treats the actor's own `personal` CalDAV collection as the first Weave-managed workspace calendar; user-private calendars require future explicit sharing/provisioning before they are safe to expose through the backend facade
+- treats the actor's own `personal` CalDAV collection as the temporary Weave-managed workspace calendar fallback while team/channel scopes are implemented; private personal calendars require later explicit sharing/provisioning before they are safe to expose through the backend facade
 
 The default Matrix workspace is provisioned by `weave-workspace/provision-matrix-default-workspace.sh` during install. See `docs/matrix-default-workspace.md` for aliases, the owner/admin-limited `announcements` policy, and current member/guest automation limits.
 
 ## 5. Backup expectations
 
-Release 1 does not ship scheduled backup jobs, but it does provide a manually runnable backup helper for operator-owned backup storage:
+The single-host baseline does not ship scheduled backup jobs, but it does provide a manually runnable backup helper for operator-owned backup storage:
 
 ```bash
 bash weave-workspace/backup.sh /var/backups/weave
@@ -137,7 +137,7 @@ WEAVE_RESTORE_SMOKE_REPROVISION_MATRIX=true bash weave-workspace/restore-smoke.s
 
 That option re-runs the idempotent default Matrix workspace provisioner before the checks. If the deployment is badly wedged but data is safe, prefer a clean host plus restored data over ad-hoc container surgery.
 
-For Release 1 Go/No-Go evidence on the dedicated runner, manually dispatch the `CI` workflow with:
+For single-host operator evidence on the dedicated runner, manually dispatch the `CI` workflow with:
 
 - `confirm_power_budget_ok=true`
 - `run_restore_smoke=true`
@@ -194,7 +194,7 @@ Escalate quickly when any of these fail:
 - Nextcloud `status.php` is not installed/healthy
 - Matrix delegated auth discovery, client versions, or `/authorize` is unavailable
 
-## 9. Known Release 1 limits
+## 9. Known operator baseline limits
 
 These are still intentionally out of scope for this repo slice:
 

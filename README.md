@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/masssi164/weave-infra/actions/workflows/ci.yml/badge.svg)](https://github.com/masssi164/weave-infra/actions/workflows/ci.yml)
 
-`weave-infra` is the Docker/Terraform infrastructure for a self-hosted Weave stack. Its Release 1 job is to give operators a repeatable single-host path for identity, chat, files/calendar foundations, backend API routing, local HTTPS, verification, backups, and support diagnostics.
+`weave-infra` is the Docker/Terraform infrastructure for a self-hosted Weave stack. Its operator baseline job is to give operators a repeatable single-host path for identity, chat, files/calendar foundations, backend API routing, local HTTPS, verification, backups, and support diagnostics.
 
-Weave's north star is broader than this repository: accessibility-first collaboration, data sovereignty, open/self-hosted control, a credible migration path from Teams/Slack-style workspaces, and a future Weaver intelligence layer for assistants, agents, automation, and connectors. This repo provides the operator substrate for that vision; it does not pretend Release 1 is the finished product.
+Weave's north star is broader than this repository: accessibility-first collaboration, data sovereignty, open/self-hosted control, a credible migration path from Teams/Slack-style workspaces, and a later Weaver intelligence layer for assistants, agents, automation, and connectors. This repo provides the operator substrate for that vision; it does not pretend operator baseline is the finished product.
 
-## Release 1 scope
+## operator baseline scope
 
-Release 1 targets a single Linux host with public DNS, public HTTPS, Docker Engine, Terraform, pinned images, explicit operator-managed secrets, and persistence/backups owned by the operator.
+operator baseline targets a single Linux host with public DNS, public HTTPS, Docker Engine, Terraform, pinned images, explicit operator-managed secrets, and persistence/backups owned by the operator.
 
 The stack provisions and configures:
 
@@ -21,7 +21,7 @@ The stack provisions and configures:
 - default Matrix workspace rooms for the MVP collaboration slice
 - install, teardown, release verification, operator checks, backup/restore smoke, and support-bundle scripts
 
-Release 1 is **not** yet the full Teams/Slack replacement, multi-host HA platform, managed SaaS installer, automatic offsite backup system, or Weaver intelligence layer. Those are future product and operations tracks.
+operator baseline is **not** yet the full Teams/Slack replacement, multi-host HA platform, managed SaaS installer, automatic offsite backup system, or Weaver intelligence layer. Those are later product and operations tracks.
 
 ## Quick start: local/dev stack
 
@@ -42,14 +42,14 @@ cd weave-workspace
 
 For deeper local details, TLS trust, port modes, smoke-test inputs, and the native app contract, see [docs/local-bootstrap.md](docs/local-bootstrap.md).
 
-## Quick start: Release 1 operator path
+## Quick start: operator baseline operator path
 
 Use the single-host guide and env template as the starting point for a real deployment:
 
 - [docs/release-1-single-host.md](docs/release-1-single-host.md): target shape, public contract, required inputs, TLS/image/persistence expectations, and verify flow
 - [weave-workspace/release.env.example](weave-workspace/release.env.example): operator-facing environment template
 - [docs/operator-runbook.md](docs/operator-runbook.md): install/upgrade, rotation, backup, restore, destructive reset, and triage guidance
-- [docs/calendar-caldav-external-clients.md](docs/calendar-caldav-external-clients.md): CalDAV discovery, safe external-client credential path, and blocked private-calendar/profile flows
+- [docs/calendar-caldav-external-clients.md](docs/calendar-caldav-external-clients.md): CalDAV discovery, safe external-client credential path, and blocked private-personal-calendar/profile flows
 - [docs/connector-runtime-guardrails.md](docs/connector-runtime-guardrails.md): disabled-by-default connector runtime, provider callback, secret, and support-bundle guardrails
 
 After installation, run public and host-local verification from the operator env:
@@ -71,7 +71,7 @@ Default local names resolve to loopback; non-local installs derive the same patt
 
 The product should prefer Weave routes and backend APIs where they exist. Raw Nextcloud remains a technical/admin/protocol fallback, not the primary customer-facing files/calendar UX.
 
-The first Calendar facade slice uses the backend-owned Nextcloud actor's own `personal` CalDAV collection as a Weave-managed workspace calendar. A backend service account cannot read every user's private Nextcloud calendar merely by targeting `/calendars/{user}/personal/`; private user calendars require a later explicit sharing, provisioning, or delegated-token contract.
+The first Calendar facade slice uses the backend-owned Nextcloud actor's own `personal` CalDAV collection as a Weave-managed workspace calendar while team/channel scopes are implemented. A backend service account cannot read every user's private personal Nextcloud calendar merely by targeting `/calendars/{user}/personal/`; private personal calendars require a later explicit sharing, provisioning, or delegated-token contract.
 
 ## Repo compass
 
@@ -81,13 +81,13 @@ The first Calendar facade slice uses the backend-owned Nextcloud actor's own `pe
 - `.github/workflows/ci.yml`: Terraform/shell validation plus manual full-stack smoke.
 - `KEYCLOAK_CONTRACT.md`: realm, client, scope, claim, and audience contract.
 - `docs/local-bootstrap.md`: local port modes, TLS trust, integration test inputs, and native app contract.
-- `docs/release-1-single-host.md`: Release 1 single-host deployment target.
+- `docs/release-1-single-host.md`: single-host deployment target.
 - `docs/operator-runbook.md`: operations, backup/restore, rotation, and triage guidance.
 - `docs/matrix-default-workspace.md`: default Matrix space/room provisioning.
 - `docs/calendar-caldav-external-clients.md`: CalDAV discovery, revocable client credentials, and fail-closed Calendar profile boundaries.
 - `weave-workspace/install.sh`: end-to-end bootstrap for local and single-host runs.
 - `weave-workspace/teardown.sh`: non-destructive cleanup by default; destructive volume reset requires explicit confirmation.
-- `weave-workspace/release-verify.sh`: public endpoint verification for non-local Release 1 installs.
+- `weave-workspace/release-verify.sh`: public endpoint verification for non-local single-host installs.
 - `weave-workspace/operator-check.sh`: host-local container and health checks.
 - `weave-workspace/backup.sh`, `restore-smoke.sh`, `support-bundle.sh`: minimum operator support and recovery helpers.
 - `weave-workspace/01-infrastructure`: Docker runtime, generated config, and service modules.
@@ -129,7 +129,7 @@ bash weave-workspace/backup.sh /var/backups/weave
 bash weave-workspace/restore-smoke.sh /var/backups/weave/<weave-backup-timestamp>
 ```
 
-For Release 1 recovery evidence on the dedicated runner, manually dispatch the `CI` workflow with `confirm_power_budget_ok=true` and `run_restore_smoke=true`. That creates private backup artifacts on the runner and runs `restore-smoke.sh` without uploading secrets.
+For recovery evidence on the dedicated runner, manually dispatch the `CI` workflow with `confirm_power_budget_ok=true` and `run_restore_smoke=true`. That creates private backup artifacts on the runner and runs `restore-smoke.sh` without uploading secrets.
 
 - Create a redacted diagnostics bundle before sharing logs manually:
 
